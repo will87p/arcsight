@@ -1,0 +1,50 @@
+========================================
+  SOLUÇÃO FINAL - ADICIONAR PACKAGES
+========================================
+
+OPÇÃO 1: Executar o script (Mais fácil)
+----------------------------------------
+1. Dê duplo clique no arquivo: ADICIONAR_PACKAGES.bat
+2. Siga as instruções que aparecerem
+
+OPÇÃO 2: GitHub Desktop (Recomendado)
+--------------------------------------
+1. Abra o GitHub Desktop
+2. Se a pasta "packages" aparecer na lista de arquivos:
+   - Escreva: "Add packages directory"
+   - Clique em "Commit to main"
+   - Clique em "Push origin"
+3. Pronto!
+
+OPÇÃO 3: Upload direto no GitHub
+---------------------------------
+1. No GitHub, clique em "Add file" → "Upload files"
+2. Vá até: C:\Users\User\Desktop\projeto arc\arcsight\packages
+3. Arraste a pasta "nextjs" inteira
+4. Aguarde o upload
+5. Faça commit
+
+OPÇÃO 4: PowerShell (Se Git estiver instalado)
+------------------------------------------------
+1. Pressione Windows + X
+2. Escolha "Windows PowerShell"
+3. Execute estes comandos:
+
+   cd "C:\Users\User\Desktop\projeto arc\arcsight"
+   git add packages/
+   git commit -m "Add packages directory"
+   git push
+
+========================================
+  DEPOIS DE ADICIONAR PACKAGES
+========================================
+
+1. Vá para o GitHub → Repositório oxwill.github.io
+2. Verifique se a pasta "packages" aparece
+3. Vá para a aba "Actions"
+4. O workflow deve rodar automaticamente
+5. Aguarde 2-5 minutos
+6. Site estará em: https://oxwill.github.io
+
+========================================
+

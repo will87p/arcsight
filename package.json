@@ -1,0 +1,22 @@
+{
+  "name": "arcsight",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=packages/nextjs",
+    "build": "npm run build --workspace=packages/nextjs",
+    "test": "npm run test --workspace=packages/hardhat",
+    "compile": "npm run compile --workspace=packages/hardhat",
+    "deploy": "npm run deploy --workspace=packages/hardhat"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.10",
+    "viem": "^2.39.3"
+  }
+}
