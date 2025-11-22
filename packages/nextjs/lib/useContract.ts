@@ -358,8 +358,28 @@ export function useContract() {
       }
 
       try {
+        // Validar e normalizar o valor
+        const normalizedAmount = amount.replace(',', '.');
+        const amountValue = parseFloat(normalizedAmount);
+        
+        if (isNaN(amountValue) || amountValue <= 0) {
+          throw new Error("Valor inválido. Use apenas números (ex: 0.1 ou 1.5)");
+        }
+
         const walletClient = getWalletClient();
         const publicClient = getPublicClient();
+
+        // Converter para wei (18 decimais - mesmo formato do ETH/USDC na Arc)
+        let value: bigint;
+        try {
+          value = parseEther(normalizedAmount);
+        } catch (parseError: any) {
+          throw new Error(`Erro ao converter valor: ${parseError.message || "Valor inválido"}`);
+        }
+
+        console.log(`[placeBet] Valor da aposta: ${normalizedAmount} USDC`);
+        console.log(`[placeBet] Valor em wei: ${value.toString()}`);
+        console.log(`[placeBet] Market ID: ${marketId}, Outcome: ${outcome}`);
 
         const hash = await walletClient.writeContract({
           address: CONTRACT_ADDRESS as Address,
@@ -367,7 +387,7 @@ export function useContract() {
           functionName: "placeBet",
           args: [BigInt(marketId), outcome],
           account: address,
-          value: parseEther(amount),
+          value: value,
         });
 
         console.log("Aposta enviada, hash:", hash);

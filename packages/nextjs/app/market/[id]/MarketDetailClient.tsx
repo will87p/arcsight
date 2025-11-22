@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import { useContract, Market } from "@/lib/useContract";
 import { useWallet } from "@/lib/useWallet";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { formatEtherValue, formatTimeRemaining, formatDate, formatAddress } from "@/lib/utils";
 
 interface MarketDetailClientProps {
@@ -15,6 +16,7 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
   const router = useRouter();
   const pathname = usePathname();
   const { address, isConnected } = useWallet();
+  const { t, language } = useLanguage();
   const { fetchMarket, placeBet, resolveMarket, claimWinnings, getUserBets } = useContract();
   
   // Estado para armazenar o marketId extraído da URL
@@ -130,28 +132,37 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
 
   async function handleBet(outcome: boolean) {
     if (!marketId) {
-      setError("ID do mercado inválido");
+      setError(t.detail.invalidId);
       return;
     }
 
     if (!isConnected) {
-      setError("Por favor, conecte sua carteira primeiro");
+      setError(language === 'pt-BR' ? "Por favor, conecte sua carteira primeiro" : "Please connect your wallet first");
       return;
     }
 
-    if (!betAmount || parseFloat(betAmount) <= 0) {
-      setError("Por favor, insira um valor válido");
+    // Validar e normalizar o valor (substituir vírgula por ponto)
+    const normalizedAmount = betAmount.replace(',', '.').trim();
+    const amountValue = parseFloat(normalizedAmount);
+    
+    if (!betAmount || isNaN(amountValue) || amountValue <= 0) {
+      setError(language === 'pt-BR' ? "Por favor, insira um valor válido maior que zero" : "Please enter a valid value greater than zero");
+      return;
+    }
+
+    if (amountValue < 0.001) {
+      setError(language === 'pt-BR' ? "O valor mínimo da aposta é 0.001 USDC" : "Minimum bet amount is 0.001 USDC");
       return;
     }
 
     if (!market || market.resolved) {
-      setError("Este mercado já foi resolvido");
+      setError(language === 'pt-BR' ? "Este mercado já foi resolvido" : "This market is already resolved");
       return;
     }
 
     const now = Math.floor(Date.now() / 1000);
     if (Number(market.resolutionTime) <= now) {
-      setError("O tempo de resolução já passou");
+      setError(t.detail.waitingResolution);
       return;
     }
 
@@ -160,12 +171,36 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
     setSuccess(null);
 
     try {
-      await placeBet(marketId, outcome, betAmount);
-      setSuccess(`Aposta de ${betAmount} USDC em ${outcome ? "SIM" : "NÃO"} realizada com sucesso!`);
+      // Usar o valor normalizado
+      await placeBet(marketId, outcome, normalizedAmount);
+      setSuccess(`${language === 'pt-BR' ? "Aposta de" : "Bet of"} ${normalizedAmount} USDC ${language === 'pt-BR' ? "em" : "on"} ${outcome ? t.marketCard.yes : t.marketCard.no} ${language === 'pt-BR' ? "realizada com sucesso!" : "placed successfully!"}`);
       setBetAmount("");
       await loadMarket();
     } catch (err: any) {
-      setError(err.message || "Erro ao fazer aposta");
+      console.error("Erro ao fazer aposta:", err);
+      
+      // Mensagens de erro mais específicas
+      let errorMessage = language === 'pt-BR' ? "Erro ao fazer aposta" : "Error placing bet";
+      
+      if (err.message?.includes("insufficient funds") || err.message?.includes("saldo") || err.message?.includes("balance")) {
+        errorMessage = language === 'pt-BR' 
+          ? "Saldo insuficiente. Verifique se você tem USDC suficiente na carteira."
+          : "Insufficient balance. Please check if you have enough USDC in your wallet.";
+      } else if (err.message?.includes("rejected") || err.message?.includes("User rejected") || err.message?.includes("denied")) {
+        errorMessage = language === 'pt-BR' ? "Transação cancelada pelo usuário" : "Transaction cancelled by user";
+      } else if (err.message?.includes("revert") || err.message?.includes("reverted")) {
+        errorMessage = language === 'pt-BR'
+          ? "Transação revertida. Verifique se o mercado ainda está aberto e se você tem saldo suficiente."
+          : "Transaction reverted. Please check if the market is still open and if you have sufficient balance.";
+      } else if (err.message?.includes("invalid value") || err.message?.includes("invalid amount") || err.message?.includes("Valor inválido")) {
+        errorMessage = language === 'pt-BR' 
+          ? "Valor inválido. Use apenas números (ex: 0.1 ou 1.5)"
+          : "Invalid value. Use only numbers (e.g., 0.1 or 1.5)";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsPlacingBet(false);
     }
@@ -458,11 +493,19 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
                   Valor (USDC)
                 </label>
                 <input
-                  type="number"
-                  step="0.001"
-                  min="0.001"
+                  type="text"
+                  inputMode="decimal"
                   value={betAmount}
-                  onChange={(e) => setBetAmount(e.target.value)}
+                  onChange={(e) => {
+                    // Permitir apenas números, ponto e vírgula
+                    const value = e.target.value.replace(/[^0-9.,]/g, '');
+                    // Substituir vírgula por ponto para validação
+                    const normalized = value.replace(',', '.');
+                    // Verificar se é um número válido
+                    if (value === '' || (!isNaN(parseFloat(normalized)) && parseFloat(normalized) >= 0)) {
+                      setBetAmount(value);
+                    }
+                  }}
                   className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-700 text-white placeholder-gray-400"
                   placeholder="0.1"
                   disabled={isPlacingBet}
@@ -486,11 +529,19 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
                   Valor (USDC)
                 </label>
                 <input
-                  type="number"
-                  step="0.001"
-                  min="0.001"
+                  type="text"
+                  inputMode="decimal"
                   value={betAmount}
-                  onChange={(e) => setBetAmount(e.target.value)}
+                  onChange={(e) => {
+                    // Permitir apenas números, ponto e vírgula
+                    const value = e.target.value.replace(/[^0-9.,]/g, '');
+                    // Substituir vírgula por ponto para validação
+                    const normalized = value.replace(',', '.');
+                    // Verificar se é um número válido
+                    if (value === '' || (!isNaN(parseFloat(normalized)) && parseFloat(normalized) >= 0)) {
+                      setBetAmount(value);
+                    }
+                  }}
                   className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-gray-700 text-white placeholder-gray-400"
                   placeholder="0.1"
                   disabled={isPlacingBet}
