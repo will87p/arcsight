@@ -86,10 +86,11 @@ export default function CreateMarket() {
 
     const timeoutId = setTimeout(() => {
       if (isSubmitting) {
+        console.warn("[handleSubmit] Timeout após 30 segundos");
         setIsSubmitting(false);
-        setError("A operação está demorando muito. Verifique se a transação foi enviada no MetaMask.");
+        setError("A operação está demorando muito. Verifique se a transação foi enviada no MetaMask. Se você aprovou a transação, ela pode estar sendo processada. Recarregue a página em alguns instantes.");
       }
-    }, 30000);
+    }, 60000); // Aumentar para 60 segundos
 
     try {
       // Salvar imagem temporariamente no sessionStorage antes de criar o mercado
@@ -98,11 +99,22 @@ export default function CreateMarket() {
         sessionStorage.setItem('pending_market_description', description);
       }
 
+      console.log("[handleSubmit] Iniciando criação de mercado...");
+      console.log("[handleSubmit] Descrição:", description);
+      console.log("[handleSubmit] Timestamp:", timestamp);
+      
       const hash = await createMarket(description, timestamp);
       clearTimeout(timeoutId);
       
+      console.log("[handleSubmit] Hash recebido:", hash);
+      
+      if (!hash || hash === '0x') {
+        throw new Error("Hash da transação inválido. Tente novamente.");
+      }
+      
       setTxHash(hash);
       setSuccess(true);
+      setIsSubmitting(false); // Garantir que o estado seja atualizado
       
       console.log("Transação enviada com sucesso! Hash:", hash);
       
@@ -111,6 +123,10 @@ export default function CreateMarket() {
       }, 2000);
     } catch (err: any) {
       clearTimeout(timeoutId);
+      setIsSubmitting(false); // Sempre atualizar o estado em caso de erro
+      
+      console.error("[handleSubmit] Erro ao criar mercado:", err);
+      console.error("[handleSubmit] Erro completo:", JSON.stringify(err, null, 2));
       
       if (err.message?.includes("timeout") || err.message?.includes("Timed out")) {
         const hashMatch = err.message?.match(/0x[a-fA-F0-9]{64}/);
@@ -121,14 +137,13 @@ export default function CreateMarket() {
           "A transação foi enviada, mas está aguardando confirmação. " +
           "Recarregue a página em alguns instantes para verificar se foi criada."
         );
-      } else if (err.code === 4001 || err.message?.includes("rejected") || err.message?.includes("denied")) {
+      } else if (err.code === 4001 || err.message?.includes("rejected") || err.message?.includes("denied") || err.message?.includes("User rejected")) {
         setError("Transação cancelada pelo usuário");
+      } else if (err.message?.includes("insufficient funds") || err.message?.includes("saldo")) {
+        setError("Saldo insuficiente. Verifique se você tem USDC suficiente na carteira.");
       } else {
-        setError(err.message || "Erro ao criar mercado");
+        setError(err.message || "Erro ao criar mercado. Verifique o console para mais detalhes.");
       }
-      console.error("Erro ao criar mercado:", err);
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
@@ -305,17 +320,31 @@ export default function CreateMarket() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
+              {isSubmitting && (
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+              )}
               {isSubmitting ? "Criando..." : "Criar Mercado"}
             </button>
             <button
               type="button"
-              onClick={() => router.back()}
-              disabled={isSubmitting}
-              className="px-6 py-3 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition disabled:opacity-50"
+              onClick={() => {
+                if (isSubmitting) {
+                  // Se estiver criando, apenas mostrar aviso
+                  if (confirm("A criação está em andamento. Deseja realmente cancelar? A transação pode continuar sendo processada.")) {
+                    setIsSubmitting(false);
+                    setError(null);
+                    router.push("/");
+                  }
+                } else {
+                  router.push("/");
+                }
+              }}
+              disabled={false}
+              className="px-6 py-3 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition"
             >
-              Cancelar
+              {isSubmitting ? "Cancelar (Aviso)" : "Cancelar"}
             </button>
           </div>
         </form>

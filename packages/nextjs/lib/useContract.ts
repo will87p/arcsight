@@ -271,20 +271,39 @@ export function useContract() {
         // Enviar transação diretamente via MetaMask
         // Deixamos o MetaMask calcular gas, gasPrice e nonce automaticamente
         // Isso evita alertas e problemas de compatibilidade
-        const hash = await window.ethereum.request({
-          method: "eth_sendTransaction",
-          params: [
-            {
-              from: walletAddress,
-              to: CONTRACT_ADDRESS,
-              data: data,
-              // Não especificamos gas, gasPrice ou nonce - deixa o MetaMask calcular
-              // Isso deve resolver o problema do alerta
-            },
-          ],
-        }) as string;
+        console.log("[executeCreateMarket] Enviando transação...");
+        console.log("[executeCreateMarket] From:", walletAddress);
+        console.log("[executeCreateMarket] To:", CONTRACT_ADDRESS);
+        console.log("[executeCreateMarket] Data:", data);
+        
+        let hash: string;
+        try {
+          hash = await window.ethereum.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                from: walletAddress,
+                to: CONTRACT_ADDRESS,
+                data: data,
+                // Não especificamos gas, gasPrice ou nonce - deixa o MetaMask calcular
+                // Isso deve resolver o problema do alerta
+              },
+            ],
+          }) as string;
+        } catch (requestError: any) {
+          console.error("[executeCreateMarket] Erro ao enviar transação:", requestError);
+          // Se o erro for de rejeição do usuário
+          if (requestError.code === 4001 || requestError.message?.includes("rejected") || requestError.message?.includes("denied") || requestError.message?.includes("User rejected")) {
+            throw new Error("Transação cancelada pelo usuário");
+          }
+          throw requestError;
+        }
 
-        console.log("Transação enviada, hash:", hash);
+        if (!hash || hash === '0x' || hash.length !== 66) {
+          throw new Error("Hash da transação inválido recebido do MetaMask");
+        }
+
+        console.log("[executeCreateMarket] Transação enviada, hash:", hash);
 
         // Retornar o hash imediatamente e confirmar em background
         // Isso evita bloquear a UI enquanto espera a confirmação
