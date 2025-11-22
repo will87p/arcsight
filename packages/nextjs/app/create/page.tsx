@@ -118,9 +118,13 @@ export default function CreateMarket() {
       
       console.log("Transação enviada com sucesso! Hash:", hash);
       
+      // Aguardar um pouco para a transação ser processada e então redirecionar
       setTimeout(() => {
-        router.push("/");
-      }, 2000);
+        // Usar window.location para garantir que a página seja recarregada completamente
+        // Isso garante que os mercados sejam recarregados do contrato
+        const basePath = process.env.NODE_ENV === 'production' ? '/arcsight' : '';
+        window.location.href = `${basePath}/`;
+      }, 3000); // Aumentar para 3 segundos para dar tempo da transação ser processada
     } catch (err: any) {
       clearTimeout(timeoutId);
       setIsSubmitting(false); // Sempre atualizar o estado em caso de erro

@@ -378,15 +378,19 @@ export function useContract() {
 
       try {
         // Validar e normalizar o valor
-        const normalizedAmount = amount.replace(',', '.');
+        const normalizedAmount = amount.replace(',', '.').trim();
         const amountValue = parseFloat(normalizedAmount);
         
         if (isNaN(amountValue) || amountValue <= 0) {
           throw new Error("Valor inválido. Use apenas números (ex: 0.1 ou 1.5)");
         }
 
-        const walletClient = getWalletClient();
         const publicClient = getPublicClient();
+
+        // Usar eth_sendTransaction diretamente para contornar problemas do MetaMask
+        if (typeof window === "undefined" || !window.ethereum) {
+          throw new Error("MetaMask não está instalado");
+        }
 
         // Converter para wei (18 decimais - mesmo formato do ETH/USDC na Arc)
         let value: bigint;
@@ -400,39 +404,103 @@ export function useContract() {
         console.log(`[placeBet] Valor em wei: ${value.toString()}`);
         console.log(`[placeBet] Market ID: ${marketId}, Outcome: ${outcome}`);
 
-        const hash = await walletClient.writeContract({
-          address: CONTRACT_ADDRESS as Address,
+        // Codificar os dados da função
+        const data = encodeFunctionData({
           abi: PREDICTION_MARKET_ABI,
           functionName: "placeBet",
           args: [BigInt(marketId), outcome],
-          account: address,
-          value: value,
         });
 
-        console.log("Aposta enviada, hash:", hash);
+        console.log(`[placeBet] Enviando transação...`);
+        console.log(`[placeBet] From: ${address}`);
+        console.log(`[placeBet] To: ${CONTRACT_ADDRESS}`);
+        console.log(`[placeBet] Value: ${value.toString()}`);
+        console.log(`[placeBet] Data: ${data}`);
 
+        // Enviar transação diretamente via MetaMask
+        // Converter valor para hex (remover '0x' se já tiver e adicionar novamente)
+        const valueHex = value.toString(16).startsWith('0x') 
+          ? value.toString(16) 
+          : `0x${value.toString(16)}`;
+        
+        console.log(`[placeBet] Valor em hex: ${valueHex}`);
+        
+        let hash: string;
         try {
-          const receipt = await publicClient.waitForTransactionReceipt({
-            hash,
-            timeout: 120_000, // 2 minutos
-            pollingInterval: 2_000, // Verificar a cada 2 segundos
-          });
-
-          if (receipt.status === "reverted") {
-            throw new Error("Transação foi revertida. Verifique se há saldo suficiente.");
+          hash = await window.ethereum.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                from: address,
+                to: CONTRACT_ADDRESS,
+                data: data,
+                value: valueHex,
+              },
+            ],
+          }) as string;
+        } catch (requestError: any) {
+          console.error("[placeBet] Erro ao enviar transação:", requestError);
+          // Se o erro for de rejeição do usuário
+          if (requestError.code === 4001 || requestError.message?.includes("rejected") || requestError.message?.includes("denied") || requestError.message?.includes("User rejected")) {
+            throw new Error("Transação cancelada pelo usuário");
           }
-
-          await fetchMarkets(); // Atualizar lista
-          return hash;
-        } catch (waitError: any) {
-          if (waitError.message?.includes("timeout") || waitError.message?.includes("Timed out")) {
-            console.warn("Timeout aguardando confirmação, mas transação foi enviada:", hash);
-            setTimeout(() => fetchMarkets(), 3000);
-            return hash;
-          }
-          throw waitError;
+          throw requestError;
         }
+
+        if (!hash || hash === '0x' || hash.length !== 66) {
+          throw new Error("Hash da transação inválido recebido do MetaMask");
+        }
+
+        console.log("[placeBet] Transação enviada, hash:", hash);
+
+        // Retornar o hash imediatamente e confirmar em background
+        const confirmInBackground = async () => {
+          try {
+            const receipt = await publicClient.waitForTransactionReceipt({
+              hash: hash as `0x${string}`,
+              timeout: 120_000, // 2 minutos
+              pollingInterval: 2_000, // Verificar a cada 2 segundos
+            });
+            
+            console.log("[placeBet] Transação confirmada:", receipt);
+            
+            if (receipt.status === "reverted") {
+              console.error("[placeBet] Transação foi revertida");
+            } else {
+              // Atualizar lista de mercados após confirmação
+              await fetchMarkets();
+            }
+          } catch (waitError: any) {
+            console.warn("[placeBet] Timeout ou erro aguardando confirmação:", waitError.message);
+            
+            // Tentar verificar o status da transação diretamente
+            try {
+              const receipt = await publicClient.getTransactionReceipt({ 
+                hash: hash as `0x${string}` 
+              });
+              
+              if (receipt) {
+                console.log("[placeBet] Transação encontrada no explorador:", receipt);
+                if (receipt.status === "success") {
+                  await fetchMarkets();
+                }
+              }
+            } catch (checkError) {
+              console.log("[placeBet] Transação ainda não confirmada, mas foi enviada");
+            }
+            
+            // Tentar atualizar os mercados após um delay
+            setTimeout(() => fetchMarkets().catch(console.error), 3000);
+          }
+        };
+
+        // Iniciar confirmação em background (não bloqueia)
+        confirmInBackground().catch(console.error);
+        
+        // Retornar hash imediatamente para não bloquear a UI
+        return hash as `0x${string}`;
       } catch (err: any) {
+        console.error("[placeBet] Erro completo:", err);
         throw new Error(err.message || "Erro ao fazer aposta");
       }
     },
