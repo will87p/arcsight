@@ -1,20 +1,31 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import { useContract, Market } from "@/lib/useContract";
 import { useWallet } from "@/lib/useWallet";
 import { formatEtherValue, formatTimeRemaining, formatDate, formatAddress } from "@/lib/utils";
 
 interface MarketDetailClientProps {
-  marketId: number;
+  marketId?: number;
 }
 
-export default function MarketDetailClient({ marketId }: MarketDetailClientProps) {
+export default function MarketDetailClient({ marketId: propMarketId }: MarketDetailClientProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { address, isConnected } = useWallet();
   const { fetchMarket, placeBet, resolveMarket, claimWinnings, getUserBets } = useContract();
+  
+  // Lê o ID da URL se não foi passado como prop (para static export)
+  const getMarketIdFromUrl = () => {
+    if (propMarketId) return propMarketId;
+    // Extrai o ID da URL: /arcsight/market/123 -> 123
+    const match = pathname?.match(/\/market\/(\d+)/);
+    return match ? parseInt(match[1]) : null;
+  };
+  
+  const marketId = getMarketIdFromUrl();
   
   const [market, setMarket] = useState<Market | null>(null);
   const [userBets, setUserBets] = useState<{ yesBet: bigint; noBet: bigint }>({ yesBet: BigInt(0), noBet: BigInt(0) });
@@ -28,10 +39,18 @@ export default function MarketDetailClient({ marketId }: MarketDetailClientProps
   const [winningOutcome, setWinningOutcome] = useState<boolean | null>(null);
 
   useEffect(() => {
-    loadMarket();
+    if (marketId) {
+      loadMarket();
+    }
   }, [marketId, address]);
 
   async function loadMarket() {
+    if (!marketId) {
+      setError("ID do mercado não encontrado");
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
     try {
@@ -142,6 +161,23 @@ export default function MarketDetailClient({ marketId }: MarketDetailClientProps
     } finally {
       setIsClaiming(false);
     }
+  }
+
+  if (!marketId) {
+    return (
+      <div className="min-h-screen bg-gray-900">
+        <Header />
+        <main className="container mx-auto px-4 py-8 text-center">
+          <p className="text-red-400 mb-4">ID do mercado inválido.</p>
+          <button
+            onClick={() => router.push("/")}
+            className="text-blue-400 hover:text-blue-300 underline"
+          >
+            Voltar para a lista
+          </button>
+        </main>
+      </div>
+    );
   }
 
   if (isLoading) {
