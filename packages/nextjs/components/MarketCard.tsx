@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { formatEtherValue, formatTimeRemaining } from "@/lib/utils";
+import { formatEtherValue, formatTimeRemaining, getMarketUrl } from "@/lib/utils";
 import { Market } from "@/lib/useContract";
 import { useWallet } from "@/lib/useWallet";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
@@ -57,7 +57,8 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
       return;
     }
 
-    window.location.href = `/market/${Number(market.id)}`;
+    // Usar a função helper para gerar URL correta
+    window.location.href = getMarketUrl(market.id);
   };
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -81,7 +82,7 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
 
   return (
     <div className="relative group">
-      <Link href={`/market/${Number(market.id)}`} className="block">
+      <Link href={getMarketUrl(market.id)} className="block">
         <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:border-blue-500/50 cursor-pointer h-full flex flex-col">
           {/* Imagem do mercado - estilo Kalshi */}
           <div className="relative h-48 bg-gradient-to-br from-blue-600/20 to-purple-600/20 overflow-hidden">

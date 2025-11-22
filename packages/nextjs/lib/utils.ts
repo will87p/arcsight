@@ -8,7 +8,7 @@ export function formatAddress(address: Address | string): string {
 
 export function formatDate(timestamp: bigint | number): string {
   const date = new Date(Number(timestamp) * 1000);
-  return date.toLocaleString("pt-BR", {
+  return date.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -19,15 +19,16 @@ export function formatDate(timestamp: bigint | number): string {
 
 export function formatTimeRemaining(timestamp: bigint | number): string {
   const now = Math.floor(Date.now() / 1000);
-  const remaining = Number(timestamp) - now;
+  const future = Number(timestamp);
+  const diff = future - now;
 
-  if (remaining <= 0) {
+  if (diff <= 0) {
     return "Tempo esgotado";
   }
 
-  const days = Math.floor(remaining / 86400);
-  const hours = Math.floor((remaining % 86400) / 3600);
-  const minutes = Math.floor((remaining % 3600) / 60);
+  const days = Math.floor(diff / 86400);
+  const hours = Math.floor((diff % 86400) / 3600);
+  const minutes = Math.floor((diff % 3600) / 60);
 
   if (days > 0) {
     return `${days} dia${days > 1 ? "s" : ""} e ${hours} hora${hours > 1 ? "s" : ""}`;
@@ -47,3 +48,21 @@ export function formatEtherValue(value: bigint | string): string {
   }
 }
 
+// Helper para gerar URLs que respeitam o basePath
+export function getMarketUrl(marketId: number | bigint): string {
+  // Em produção no GitHub Pages, o basePath é /arcsight
+  // Verificamos se estamos em produção pela URL ou pela variável de ambiente
+  let basePath = '';
+  
+  if (typeof window !== 'undefined') {
+    // Se a URL atual contém /arcsight, usamos o basePath
+    if (window.location.pathname.startsWith('/arcsight')) {
+      basePath = '/arcsight';
+    }
+  } else {
+    // No servidor, verificar variável de ambiente
+    basePath = process.env.NODE_ENV === 'production' ? '/arcsight' : '';
+  }
+  
+  return `${basePath}/market/${Number(marketId)}`;
+}
