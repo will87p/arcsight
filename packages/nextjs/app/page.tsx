@@ -74,6 +74,44 @@ export default function Home() {
   // Carregar mercados quando a página carrega
   useEffect(() => {
     fetchMarkets();
+    
+    // Sincronizar imagens do JSONBin (compartilhado) quando carregar mercados
+    const syncImages = async () => {
+      try {
+        const { fetchSharedImages } = await import("@/lib/imageStorage");
+        const sharedImages = await fetchSharedImages();
+        
+        if (sharedImages.length > 0) {
+          console.log(`[page.tsx] Sincronizando ${sharedImages.length} imagens do JSONBin...`);
+          
+          // Salvar imagens compartilhadas no localStorage local
+          const { getMarketImages } = await import("@/lib/imageStorage");
+          const localImages = getMarketImages();
+          
+          // Mesclar imagens compartilhadas com locais (compartilhadas têm prioridade)
+          const mergedImages = [...localImages];
+          sharedImages.forEach(sharedImage => {
+            const existingIndex = mergedImages.findIndex(img => img.marketId === sharedImage.marketId);
+            if (existingIndex >= 0) {
+              // Atualizar se a imagem compartilhada for mais recente ou for uma URL (não base64)
+              if (sharedImage.imageUrl.startsWith('http') || sharedImage.timestamp > mergedImages[existingIndex].timestamp) {
+                mergedImages[existingIndex] = sharedImage;
+              }
+            } else {
+              mergedImages.push(sharedImage);
+            }
+          });
+          
+          // Salvar no localStorage
+          localStorage.setItem('arcsight_market_images', JSON.stringify(mergedImages));
+          console.log(`[page.tsx] ${mergedImages.length} imagens sincronizadas`);
+        }
+      } catch (error) {
+        console.warn('[page.tsx] Erro ao sincronizar imagens (continuando):', error);
+      }
+    };
+    
+    syncImages();
   }, [fetchMarkets]);
 
   // Associar imagem pendente ao mercado recém-criado

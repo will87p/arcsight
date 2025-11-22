@@ -99,8 +99,11 @@ export async function saveMarketImage(marketId: number, base64Image: string): Pr
     localStorage.setItem('arcsight_market_images', JSON.stringify(localImages));
     
     // Tentar salvar no JSONBin (compartilhado) se configurado
+    // IMPORTANTE: Isso permite que outros usuários vejam a imagem
     if (JSONBIN_URL && imageUrl) {
       try {
+        console.log(`[saveMarketImage] Sincronizando imagem do mercado ${marketId} no JSONBin...`);
+        
         // Buscar imagens existentes do JSONBin
         const sharedImages = await fetchSharedImages();
         
@@ -114,16 +117,23 @@ export async function saveMarketImage(marketId: number, base64Image: string): Pr
         
         // Salvar de volta no JSONBin
         await saveSharedImages(sharedImages);
-        console.log(`[saveMarketImage] Imagem do mercado ${marketId} sincronizada no JSONBin`);
+        console.log(`[saveMarketImage] ✅ Imagem do mercado ${marketId} sincronizada no JSONBin - visível para todos!`);
       } catch (syncError) {
-        console.warn(`[saveMarketImage] Erro ao sincronizar no JSONBin (continuando):`, syncError);
+        console.warn(`[saveMarketImage] ⚠️ Erro ao sincronizar no JSONBin:`, syncError);
+        console.warn(`[saveMarketImage] A imagem foi salva localmente, mas NÃO será visível para outros usuários.`);
+        console.warn(`[saveMarketImage] Verifique se NEXT_PUBLIC_JSONBIN_BIN_ID está configurado corretamente.`);
       }
+    } else if (imageUrl && !JSONBIN_URL) {
+      console.warn(`[saveMarketImage] ⚠️ JSONBin não configurado.`);
+      console.warn(`[saveMarketImage] A imagem foi enviada para ImgBB (${imageUrl}), mas a URL não será compartilhada.`);
+      console.warn(`[saveMarketImage] Configure NEXT_PUBLIC_JSONBIN_BIN_ID para que outros usuários vejam as imagens.`);
+      console.warn(`[saveMarketImage] Veja SOLUCAO_IMAGENS_SIMPLES.md para instruções.`);
     }
     
     if (imageUrl) {
       console.log(`[saveMarketImage] Imagem do mercado ${marketId} salva no ImgBB: ${imageUrl}`);
     } else {
-      console.warn(`[saveMarketImage] Imagem do mercado ${marketId} salva localmente (fallback)`);
+      console.warn(`[saveMarketImage] Imagem do mercado ${marketId} salva localmente (fallback - apenas você verá)`);
     }
   } catch (error) {
     console.error('Erro ao salvar imagem do mercado:', error);
@@ -150,8 +160,9 @@ export async function saveMarketImage(marketId: number, base64Image: string): Pr
 
 /**
  * Busca imagens do JSONBin (armazenamento compartilhado)
+ * Exportada para uso em outros componentes
  */
-async function fetchSharedImages(): Promise<MarketImage[]> {
+export async function fetchSharedImages(): Promise<MarketImage[]> {
   if (!JSONBIN_URL) {
     return [];
   }
