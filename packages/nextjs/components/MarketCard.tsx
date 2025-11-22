@@ -122,16 +122,13 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
                 src={imageUrl}
                 alt={market.description}
                 className="w-full h-full object-cover"
-                onError={(e) => {
+                onError={() => {
                   console.error(`[MarketCard] Erro ao carregar imagem:`, imageUrl);
                   setImageUrl(null);
                 }}
                 onLoad={() => {
                   console.log(`[MarketCard] ✅ Imagem carregada com sucesso:`, imageUrl.substring(0, 50) + '...');
                 }}
-                alt={market.description}
-                className="w-full h-full object-cover"
-                onError={() => setImageUrl(null)}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800">
