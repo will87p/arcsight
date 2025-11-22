@@ -93,10 +93,21 @@ export default function CreateMarket() {
     }, 60000); // Aumentar para 60 segundos
 
     try {
-      // Salvar imagem temporariamente no sessionStorage antes de criar o mercado
+      // Fazer upload da imagem antes de criar o mercado
+      let uploadedImageUrl: string | null = null;
       if (imagePreview) {
-        sessionStorage.setItem('pending_market_image', imagePreview);
-        sessionStorage.setItem('pending_market_description', description);
+        try {
+          console.log("[handleSubmit] Fazendo upload da imagem...");
+          const { saveMarketImage } = await import("@/lib/imageStorage");
+          // Salvar temporariamente no sessionStorage enquanto faz upload
+          sessionStorage.setItem('pending_market_image', imagePreview);
+          sessionStorage.setItem('pending_market_description', description);
+          
+          // O upload será feito após a criação do mercado (em background)
+          // para não bloquear a criação
+        } catch (uploadError) {
+          console.warn("[handleSubmit] Erro ao fazer upload da imagem (continuando sem imagem):", uploadError);
+        }
       }
 
       console.log("[handleSubmit] Iniciando criação de mercado...");

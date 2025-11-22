@@ -89,13 +89,22 @@ export default function Home() {
         );
         
         if (matchingMarket) {
-          // Salvar a imagem associada ao mercado
-          saveMarketImage(Number(matchingMarket.id), pendingImage);
-          // Limpar sessionStorage
-          sessionStorage.removeItem('pending_market_image');
-          sessionStorage.removeItem('pending_market_description');
-          // Recarregar para mostrar a imagem
-          fetchMarkets();
+          // Fazer upload da imagem e salvar a URL
+          saveMarketImage(Number(matchingMarket.id), pendingImage)
+            .then(() => {
+              console.log(`[page.tsx] Imagem do mercado ${matchingMarket.id} salva com sucesso`);
+              // Limpar sessionStorage
+              sessionStorage.removeItem('pending_market_image');
+              sessionStorage.removeItem('pending_market_description');
+              // Recarregar para mostrar a imagem
+              fetchMarkets();
+            })
+            .catch((error) => {
+              console.error(`[page.tsx] Erro ao salvar imagem do mercado ${matchingMarket.id}:`, error);
+              // Limpar sessionStorage mesmo em caso de erro
+              sessionStorage.removeItem('pending_market_image');
+              sessionStorage.removeItem('pending_market_description');
+            });
         }
       }
     }
