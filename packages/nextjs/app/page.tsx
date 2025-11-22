@@ -75,43 +75,83 @@ export default function Home() {
   useEffect(() => {
     fetchMarkets();
     
-    // Sincronizar imagens do JSONBin (compartilhado) quando carregar mercados
-    const syncImages = async () => {
-      try {
-        const { fetchSharedImages } = await import("@/lib/imageStorage");
-        const sharedImages = await fetchSharedImages();
-        
-        if (sharedImages.length > 0) {
-          console.log(`[page.tsx] Sincronizando ${sharedImages.length} imagens do JSONBin...`);
-          
-          // Salvar imagens compartilhadas no localStorage local
-          const { getMarketImages } = await import("@/lib/imageStorage");
-          const localImages = getMarketImages();
-          
-          // Mesclar imagens compartilhadas com locais (compartilhadas têm prioridade)
-          const mergedImages = [...localImages];
-          sharedImages.forEach(sharedImage => {
-            const existingIndex = mergedImages.findIndex(img => img.marketId === sharedImage.marketId);
-            if (existingIndex >= 0) {
-              // Atualizar se a imagem compartilhada for mais recente ou for uma URL (não base64)
-              if (sharedImage.imageUrl.startsWith('http') || sharedImage.timestamp > mergedImages[existingIndex].timestamp) {
-                mergedImages[existingIndex] = sharedImage;
-              }
-            } else {
-              mergedImages.push(sharedImage);
-            }
-          });
-          
-          // Salvar no localStorage
-          localStorage.setItem('arcsight_market_images', JSON.stringify(mergedImages));
-          console.log(`[page.tsx] ${mergedImages.length} imagens sincronizadas`);
-        }
-      } catch (error) {
-        console.warn('[page.tsx] Erro ao sincronizar imagens (continuando):', error);
+    // Verificar configuração de imagens
+    const checkImageConfig = () => {
+      const imgbbKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
+      const jsonbinId = process.env.NEXT_PUBLIC_JSONBIN_BIN_ID;
+      
+      if (!imgbbKey) {
+        console.warn('⚠️ NEXT_PUBLIC_IMGBB_API_KEY não configurado. Imagens não serão enviadas para servidor público.');
+        console.warn('📖 Veja CONFIGURAR_IMAGENS_PASSO_A_PASSO.md para instruções.');
+      }
+      
+      if (!jsonbinId) {
+        console.warn('⚠️ NEXT_PUBLIC_JSONBIN_BIN_ID não configurado. Imagens não serão compartilhadas entre usuários.');
+        console.warn('📖 Veja CONFIGURAR_IMAGENS_PASSO_A_PASSO.md para instruções.');
+        console.warn('🔗 JSONBin: https://jsonbin.io/');
+      } else {
+        console.log('✅ JSONBin configurado. Imagens serão compartilhadas entre usuários.');
       }
     };
     
-    syncImages();
+    checkImageConfig();
+    
+    // Migrar imagens antigas (base64) para ImgBB e sincronizar
+    const syncAndMigrateImages = async () => {
+      try {
+        // 1. Primeiro, sincronizar imagens do JSONBin (prioridade)
+        console.log('[page.tsx] 🔄 Iniciando sincronização de imagens...');
+        const { fetchSharedImages, getMarketImages } = await import("@/lib/imageStorage");
+        const sharedImages = await fetchSharedImages();
+        
+        if (sharedImages.length > 0) {
+          console.log(`[page.tsx] 📥 ${sharedImages.length} imagens encontradas no JSONBin`);
+          
+          const localImages = getMarketImages();
+          const mergedImages = [...localImages];
+          let addedCount = 0;
+          let updatedCount = 0;
+          
+          sharedImages.forEach(sharedImage => {
+            // Apenas processar imagens com URLs válidas (http)
+            if (!sharedImage.imageUrl || !sharedImage.imageUrl.startsWith('http')) {
+              return;
+            }
+            
+            const existingIndex = mergedImages.findIndex(img => img.marketId === sharedImage.marketId);
+            if (existingIndex >= 0) {
+              const existing = mergedImages[existingIndex];
+              // Sempre atualizar se a imagem compartilhada for uma URL (mesmo que já exista)
+              if (sharedImage.imageUrl.startsWith('http')) {
+                mergedImages[existingIndex] = sharedImage;
+                updatedCount++;
+              }
+            } else {
+              mergedImages.push(sharedImage);
+              addedCount++;
+            }
+          });
+          
+          localStorage.setItem('arcsight_market_images', JSON.stringify(mergedImages));
+          console.log(`[page.tsx] ✅ Sincronização: ${addedCount} novas, ${updatedCount} atualizadas, ${mergedImages.length} total`);
+        }
+        
+        // 2. Depois, migrar imagens antigas (base64) para ImgBB
+        const { migrateOldImages, clearSharedImagesCache } = await import("@/lib/imageStorage");
+        await migrateOldImages();
+        
+        // 3. Limpar cache para forçar recarregamento
+        clearSharedImagesCache();
+        
+        // 4. Disparar evento customizado para que MarketCards recarreguem
+        window.dispatchEvent(new CustomEvent('imagesSynced'));
+        console.log('[page.tsx] ✅ Sincronização completa - MarketCards serão atualizados');
+      } catch (error) {
+        console.warn('[page.tsx] ⚠️ Erro ao sincronizar imagens (continuando):', error);
+      }
+    };
+    
+    syncAndMigrateImages();
   }, [fetchMarkets]);
 
   // Associar imagem pendente ao mercado recém-criado

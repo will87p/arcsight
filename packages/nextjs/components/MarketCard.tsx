@@ -26,10 +26,38 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
   // Carregar imagem do mercado
   useEffect(() => {
     const loadImage = async () => {
-      const image = await getMarketImage(Number(market.id));
-      setImageUrl(image);
+      try {
+        const marketId = Number(market.id);
+        const image = await getMarketImage(marketId);
+        if (image && image.startsWith('http')) {
+          setImageUrl(image);
+        } else {
+          setImageUrl(null);
+        }
+      } catch (error) {
+        console.error(`[MarketCard] Erro ao carregar imagem:`, error);
+        setImageUrl(null);
+      }
     };
+    
+    // Carregar imediatamente
     loadImage();
+    
+    // Ouvir evento de sincronização para recarregar
+    const handleImagesSynced = () => {
+      console.log(`[MarketCard] Evento de sincronização recebido, recarregando imagem do mercado ${market.id}...`);
+      loadImage();
+    };
+    
+    window.addEventListener('imagesSynced', handleImagesSynced);
+    
+    // Recarregar a cada 10 segundos (menos frequente para evitar rate limit)
+    const interval = setInterval(loadImage, 10000);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('imagesSynced', handleImagesSynced);
+    };
   }, [market.id]);
 
   // Calcular probabilidades
@@ -89,9 +117,18 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
         <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:border-blue-500/50 cursor-pointer h-full flex flex-col">
           {/* Imagem do mercado - estilo Kalshi */}
           <div className="relative h-48 bg-gradient-to-br from-blue-600/20 to-purple-600/20 overflow-hidden">
-            {imageUrl ? (
+            {imageUrl && imageUrl.startsWith('http') ? (
               <img
                 src={imageUrl}
+                alt={market.description}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  console.error(`[MarketCard] Erro ao carregar imagem:`, imageUrl);
+                  setImageUrl(null);
+                }}
+                onLoad={() => {
+                  console.log(`[MarketCard] ✅ Imagem carregada com sucesso:`, imageUrl.substring(0, 50) + '...');
+                }}
                 alt={market.description}
                 className="w-full h-full object-cover"
                 onError={() => setImageUrl(null)}

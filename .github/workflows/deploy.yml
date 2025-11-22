@@ -48,7 +48,9 @@ jobs:
           NEXT_PUBLIC_NETWORK: ${{ secrets.NEXT_PUBLIC_NETWORK || 'arc' }}
           NEXT_PUBLIC_ARC_RPC_URL: ${{ secrets.NEXT_PUBLIC_ARC_RPC_URL || 'https://rpc.testnet.arc.network' }}
           NEXT_PUBLIC_ARC_CHAIN_ID: ${{ secrets.NEXT_PUBLIC_ARC_CHAIN_ID || '5042002' }}
-          NEXT_PUBLIC_IMGBB_API_KEY: ${{ secrets.NEXT_PUBLIC_IMGBB_API_KEY || '' }}
+          NEXT_PUBLIC_IMGBB_API_KEY: ${{ secrets.NEXT_PUBLIC_IMGBB_API_KEY || '51d62785e6f94973e46fbaf3d154f6b4' }}
+          NEXT_PUBLIC_JSONBIN_BIN_ID: ${{ secrets.NEXT_PUBLIC_JSONBIN_BIN_ID || '6921e984ae596e708f69f4d8' }}
+          NEXT_PUBLIC_JSONBIN_API_KEY: ${{ secrets.NEXT_PUBLIC_JSONBIN_API_KEY || '' }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
