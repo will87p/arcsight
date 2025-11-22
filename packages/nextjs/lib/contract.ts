@@ -38,6 +38,13 @@ export const PREDICTION_MARKET_ABI = [
     type: "function",
   },
   {
+    inputs: [{ internalType: "uint256", name: "_marketId", type: "uint256" }],
+    name: "deleteMarket",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     name: "markets",
     outputs: [
@@ -151,6 +158,15 @@ export const PREDICTION_MARKET_ABI = [
       { indexed: false, internalType: "uint256", name: "amount", type: "uint256" },
     ],
     name: "WinningsClaimed",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "uint256", name: "marketId", type: "uint256" },
+      { indexed: true, internalType: "address", name: "creator", type: "address" },
+    ],
+    name: "MarketDeleted",
     type: "event",
   },
 ] as const;
