@@ -26,3 +26,6 @@ if (Test-Path ".git") {
     Write-Host "Certifique-se de que o GitHub Desktop está configurado corretamente." -ForegroundColor Yellow
 }
 
+
+
+

@@ -1,35 +1,157 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
+import FilterBar from "@/components/FilterBar";
+import MarketCard from "@/components/MarketCard";
 import { useContract } from "@/lib/useContract";
 import { useWallet } from "@/lib/useWallet";
-import { formatEtherValue, formatTimeRemaining } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { formatEtherValue } from "@/lib/utils";
+import { saveMarketImage } from "@/lib/imageStorage";
 
 export default function Home() {
   const { markets, isLoading, error, fetchMarkets, deleteMarket } = useContract();
   const { address, isConnected } = useWallet();
+  const { t, language } = useLanguage();
   const [deletingMarketId, setDeletingMarketId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
+
+  // Função para detectar categoria do mercado baseado na descrição
+  const getMarketCategory = (description: string): string => {
+    const desc = description.toLowerCase();
+    
+    if (desc.includes('política') || desc.includes('eleição') || desc.includes('presidente') || 
+        desc.includes('governo') || desc.includes('político') || desc.includes('votação')) {
+      return 'politics';
+    }
+    if (desc.includes('esporte') || desc.includes('futebol') || desc.includes('basquete') || 
+        desc.includes('fórmula') || desc.includes('olímpico') || desc.includes('campeonato')) {
+      return 'sports';
+    }
+    if (desc.includes('cultura') || desc.includes('filme') || desc.includes('música') || 
+        desc.includes('arte') || desc.includes('oscar') || desc.includes('festival')) {
+      return 'culture';
+    }
+    if (desc.includes('bitcoin') || desc.includes('cripto') || desc.includes('crypto') || 
+        desc.includes('ethereum') || desc.includes('blockchain') || desc.includes('nft')) {
+      return 'crypto';
+    }
+    if (desc.includes('clima') || desc.includes('temperatura') || desc.includes('chuva') || 
+        desc.includes('aquecimento') || desc.includes('ambiental')) {
+      return 'climate';
+    }
+    if (desc.includes('economia') || desc.includes('inflação') || desc.includes('juros') || 
+        desc.includes('pib') || desc.includes('recessão')) {
+      return 'economy';
+    }
+    if (desc.includes('empresa') || desc.includes('corporação') || desc.includes('negócio') || 
+        desc.includes('startup')) {
+      return 'companies';
+    }
+    if (desc.includes('finança') || desc.includes('investimento') || desc.includes('ação') || 
+        desc.includes('bolsa') || desc.includes('mercado financeiro')) {
+      return 'finance';
+    }
+    if (desc.includes('tecnologia') || desc.includes('ciência') || desc.includes('ia') || 
+        desc.includes('inteligência artificial') || desc.includes('robô') || desc.includes('software')) {
+      return 'tech';
+    }
+    if (desc.includes('saúde') || desc.includes('médico') || desc.includes('hospital') || 
+        desc.includes('doença') || desc.includes('vacina')) {
+      return 'health';
+    }
+    if (desc.includes('mundo') || desc.includes('internacional') || desc.includes('global') || 
+        desc.includes('guerra') || desc.includes('país')) {
+      return 'world';
+    }
+    
+    return 'all';
+  };
 
   // Carregar mercados quando a página carrega
   useEffect(() => {
     fetchMarkets();
   }, [fetchMarkets]);
 
-  async function handleDeleteMarket(marketId: number, e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  // Associar imagem pendente ao mercado recém-criado
+  useEffect(() => {
+    if (markets.length > 0) {
+      const pendingImage = sessionStorage.getItem('pending_market_image');
+      const pendingDescription = sessionStorage.getItem('pending_market_description');
+      
+      if (pendingImage && pendingDescription) {
+        // Encontrar o mercado mais recente com a descrição correspondente
+        const matchingMarket = markets.find(
+          m => m.description.toLowerCase().trim() === pendingDescription.toLowerCase().trim()
+        );
+        
+        if (matchingMarket) {
+          // Salvar a imagem associada ao mercado
+          saveMarketImage(Number(matchingMarket.id), pendingImage);
+          // Limpar sessionStorage
+          sessionStorage.removeItem('pending_market_image');
+          sessionStorage.removeItem('pending_market_description');
+          // Recarregar para mostrar a imagem
+          fetchMarkets();
+        }
+      }
+    }
+  }, [markets, fetchMarkets]);
+
+  // Filtrar e buscar mercados
+  const filteredMarkets = useMemo(() => {
+    let filtered = markets;
+
+    // Aplicar filtro de categoria
+    if (activeFilter === "trending") {
+      // Mercados com maior volume (top 10)
+      filtered = [...filtered]
+        .sort((a, b) => {
+          const totalA = Number(a.totalYesAmount + a.totalNoAmount);
+          const totalB = Number(b.totalYesAmount + b.totalNoAmount);
+          return totalB - totalA;
+        })
+        .slice(0, 10);
+    } else if (activeFilter === "new") {
+      // Mercados mais recentes (não resolvidos, ordenados por ID decrescente)
+      filtered = filtered
+        .filter((market) => !market.resolved)
+        .sort((a, b) => Number(b.id) - Number(a.id));
+    } else if (activeFilter !== "all") {
+      // Filtrar por categoria
+      filtered = filtered.filter((market) => 
+        getMarketCategory(market.description) === activeFilter
+      );
+    }
+
+    // Aplicar busca
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((market) =>
+        market.description.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [markets, activeFilter, searchQuery]);
+
+  async function handleDeleteMarket(marketId: number) {
     if (!confirm("Tem certeza que deseja deletar este mercado? Esta ação não pode ser desfeita.")) {
       return;
     }
 
     setDeletingMarketId(marketId);
     try {
-      await deleteMarket(marketId);
-      alert("Mercado deletado com sucesso!");
+      const hash = await deleteMarket(marketId);
+      console.log("Mercado deletado, hash da transação:", hash);
+      setTimeout(() => {
+        fetchMarkets();
+      }, 2000);
     } catch (err: any) {
+      console.error("Erro ao deletar mercado:", err);
       alert(err.message || "Erro ao deletar mercado");
     } finally {
       setDeletingMarketId(null);
@@ -37,110 +159,140 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
-      <Header />
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-950">
+      <Header onSearch={setSearchQuery} />
+      <FilterBar activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+      
+      <main className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Hero Section */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-8">Mercados Abertos</h1>
-          <div className="flex gap-4 justify-center items-center">
-            <Link
-              href="/create"
-              className="inline-block px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-lg shadow-lg"
-            >
-              Criar Novo Mercado
-            </Link>
-          </div>
+          <h1 className="text-5xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+            {t.home.title}
+          </h1>
+          <p className="text-gray-400 text-lg mb-8 max-w-2xl mx-auto">
+            {t.home.subtitle}
+          </p>
+          <Link
+            href="/create"
+            className="inline-block px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-500 hover:to-blue-400 transition-all font-semibold text-lg shadow-lg hover:shadow-blue-500/50 transform hover:scale-105 active:scale-95"
+          >
+            {t.home.createNewMarket}
+          </Link>
         </div>
 
+        {/* Seção Faucet - Obter USDC Testnet */}
+        {!isConnected && (
+          <div className="mb-8 p-4 bg-gradient-to-r from-green-900/30 to-green-800/30 border border-green-700/50 rounded-xl">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-600/20 rounded-lg">
+                  <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold mb-1">{t.home.needTestnetUSDC}</h3>
+                  <p className="text-gray-400 text-sm">{t.home.faucetDescription}</p>
+                </div>
+              </div>
+              <a
+                href="https://faucet.circle.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 transition font-semibold shadow-lg hover:shadow-green-500/50 whitespace-nowrap flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                {t.home.getUSDC}
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Estatísticas rápidas */}
+        {!isLoading && markets.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+              <div className="text-sm text-gray-400 mb-1">{t.home.totalMarkets}</div>
+              <div className="text-2xl font-bold text-white">{markets.length}</div>
+            </div>
+            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+              <div className="text-sm text-gray-400 mb-1">{t.home.openMarkets}</div>
+              <div className="text-2xl font-bold text-green-400">
+                {markets.filter((m) => !m.resolved).length}
+              </div>
+            </div>
+            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+              <div className="text-sm text-gray-400 mb-1">{t.home.totalVolume}</div>
+              <div className="text-2xl font-bold text-blue-400">
+                ${markets.reduce((sum, m) => {
+                  const total = m.totalYesAmount + m.totalNoAmount;
+                  return sum + parseFloat(formatEtherValue(total));
+                }, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mensagens de erro */}
         {error && (
-          <div className="mb-6 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-400">
-            <p className="font-semibold">Erro:</p>
-            <p>{error}</p>
+          <div className="mb-6 p-4 bg-red-900/30 border border-red-700 rounded-xl text-red-400">
+            <p className="font-semibold mb-1">{t.common.error}</p>
+            <p className="text-sm">{error}</p>
             <button
               onClick={fetchMarkets}
-              className="mt-2 text-sm underline hover:text-red-300"
+              className="mt-3 text-sm underline hover:text-red-300 transition"
             >
-              Tentar novamente
+              {t.common.tryAgain}
             </button>
           </div>
         )}
 
+        {/* Loading state */}
         {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-400 text-lg">Carregando mercados...</p>
+          <div className="text-center py-16">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <p className="text-gray-400 text-lg">{t.home.loading}</p>
           </div>
-        ) : markets.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-400 text-lg mb-4">Nenhum mercado encontrado.</p>
-            <Link
-              href="/create"
-              className="text-blue-400 hover:text-blue-300 underline"
-            >
-              Criar o primeiro mercado
-            </Link>
+        ) : filteredMarkets.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4">📊</div>
+            <p className="text-gray-400 text-lg mb-2">
+              {searchQuery || activeFilter !== "all"
+                ? t.home.noMarketsFiltered
+                : t.home.noMarkets}
+            </p>
+            {!searchQuery && activeFilter === "all" && (
+              <Link
+                href="/create"
+                className="text-blue-400 hover:text-blue-300 underline transition"
+              >
+                {t.home.createFirstMarket}
+              </Link>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {markets.map((market) => {
-              const totalPot = market.totalYesAmount + market.totalNoAmount;
-              const isResolved = market.resolved;
-              const timeRemaining = isResolved
-                ? "Resolvido"
-                : formatTimeRemaining(market.resolutionTime);
-              
-              // Verificar se pode deletar: é o criador, não está resolvido e não tem apostas
-              const canDelete = isConnected && 
-                address?.toLowerCase() === market.creator.toLowerCase() &&
-                !isResolved && 
-                totalPot === BigInt(0);
-              const isDeleting = deletingMarketId === Number(market.id);
+          <>
+            {/* Resultados da busca/filtro */}
+            {(searchQuery || activeFilter !== "all") && (
+              <div className="mb-6 text-sm text-gray-400">
+                {t.home.showing} {filteredMarkets.length} {t.home.of} {markets.length} {t.home.markets}{markets.length !== 1 ? (language === 'pt-BR' ? 's' : 's') : ''}
+              </div>
+            )}
 
-              return (
-                <div key={market.id.toString()} className="relative">
-                  <Link
-                    href={`/market/${market.id}`}
-                    className="block"
-                  >
-                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition hover:border-blue-500 cursor-pointer h-full flex flex-col">
-                      <h3 className="text-xl font-semibold text-white mb-4 line-clamp-2 flex-grow">
-                        {market.description}
-                      </h3>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-400">Pote Total:</span>
-                          <span className="text-lg font-bold text-blue-400">
-                            {formatEtherValue(totalPot)} USDC
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-400">Status:</span>
-                          <span
-                            className={`text-sm font-medium ${
-                              isResolved
-                                ? "text-green-400"
-                                : "text-yellow-400"
-                            }`}
-                          >
-                            {isResolved ? "Resolvido" : timeRemaining}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                  {canDelete && (
-                    <button
-                      onClick={(e) => handleDeleteMarket(Number(market.id), e)}
-                      disabled={isDeleting}
-                      className="absolute top-2 right-2 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                      title="Deletar mercado (apenas se não houver apostas)"
-                    >
-                      {isDeleting ? "Deletando..." : "🗑️"}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+            {/* Grid de mercados - estilo Kalshi */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredMarkets.map((market) => (
+                <MarketCard
+                  key={market.id.toString()}
+                  market={market}
+                  onDelete={handleDeleteMarket}
+                  deletingMarketId={deletingMarketId}
+                />
+              ))}
+            </div>
+          </>
         )}
       </main>
     </div>

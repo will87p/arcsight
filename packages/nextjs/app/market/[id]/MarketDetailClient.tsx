@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import { useContract, Market } from "@/lib/useContract";
@@ -17,16 +17,72 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
   const { address, isConnected } = useWallet();
   const { fetchMarket, placeBet, resolveMarket, claimWinnings, getUserBets } = useContract();
   
-  // Lê o ID da URL se não foi passado como prop (para static export)
-  const getMarketIdFromUrl = () => {
-    if (propMarketId) return propMarketId;
-    // Extrai o ID da URL: /arcsight/market/123 -> 123
-    const match = pathname?.match(/\/market\/(\d+)/);
-    return match ? parseInt(match[1]) : null;
-  };
-  
-  const marketId = getMarketIdFromUrl();
-  
+  // Estado para armazenar o marketId extraído da URL
+  const [extractedMarketId, setExtractedMarketId] = useState<number | null>(null);
+
+  // Função para extrair o ID da URL
+  const extractMarketIdFromUrl = useCallback(() => {
+    if (propMarketId) {
+      setExtractedMarketId(propMarketId);
+      return;
+    }
+    
+    let foundId: number | null = null;
+    
+    // Tenta extrair da URL de várias formas
+    if (pathname) {
+      // Formato: /market/123 ou /arcsight/market/123
+      const match = pathname.match(/\/market\/(\d+)/);
+      if (match && match[1]) {
+        const parsed = parseInt(match[1], 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          foundId = parsed;
+        }
+      }
+      
+      // Fallback: pegar o último segmento numérico da URL
+      if (!foundId) {
+        const segments = pathname.split('/').filter(Boolean);
+        const lastSegment = segments[segments.length - 1];
+        if (lastSegment && /^\d+$/.test(lastSegment)) {
+          const parsed = parseInt(lastSegment, 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            foundId = parsed;
+          }
+        }
+      }
+    }
+    
+    // Fallback: tentar pegar da window.location
+    if (!foundId && typeof window !== 'undefined') {
+      const urlMatch = window.location.pathname.match(/\/market\/(\d+)/);
+      if (urlMatch && urlMatch[1]) {
+        const parsed = parseInt(urlMatch[1], 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          foundId = parsed;
+        }
+      }
+    }
+    
+    setExtractedMarketId(foundId);
+  }, [propMarketId, pathname]);
+
+  // Extrair o ID quando o componente montar ou quando pathname/propMarketId mudar
+  useEffect(() => {
+    extractMarketIdFromUrl();
+  }, [extractMarketIdFromUrl]);
+
+  // Usar propMarketId se disponível, senão usar o extraído
+  const marketId = propMarketId || extractedMarketId;
+
+  // Debug: log do marketId
+  useEffect(() => {
+    console.log('[MarketDetailClient] marketId:', marketId);
+    console.log('[MarketDetailClient] pathname:', pathname);
+    console.log('[MarketDetailClient] propMarketId:', propMarketId);
+    console.log('[MarketDetailClient] extractedMarketId:', extractedMarketId);
+  }, [marketId, pathname, propMarketId, extractedMarketId]);
+
   const [market, setMarket] = useState<Market | null>(null);
   const [userBets, setUserBets] = useState<{ yesBet: bigint; noBet: bigint }>({ yesBet: BigInt(0), noBet: BigInt(0) });
   const [betAmount, setBetAmount] = useState("");
@@ -178,18 +234,34 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
     }
   }
 
+  // Só mostrar erro se não estiver carregando e não tiver marketId
+  if (!marketId && !isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900">
+        <Header />
+        <main className="container mx-auto px-4 py-8 text-center">
+          <p className="text-red-400 mb-4">ID do mercado inválido ou não encontrado.</p>
+          <p className="text-gray-400 text-sm mb-4">
+            URL: {typeof window !== 'undefined' ? window.location.pathname : pathname}
+          </p>
+          <button
+            onClick={() => router.push("/")}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Voltar para a lista
+          </button>
+        </main>
+      </div>
+    );
+  }
+  
+  // Se não tem marketId mas está carregando, mostrar loading
   if (!marketId) {
     return (
       <div className="min-h-screen bg-gray-900">
         <Header />
         <main className="container mx-auto px-4 py-8 text-center">
-          <p className="text-red-400 mb-4">ID do mercado inválido.</p>
-          <button
-            onClick={() => router.push("/")}
-            className="text-blue-400 hover:text-blue-300 underline"
-          >
-            Voltar para a lista
-          </button>
+          <p className="text-gray-400 text-lg">Carregando mercado...</p>
         </main>
       </div>
     );

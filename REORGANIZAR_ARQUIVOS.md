@@ -94,3 +94,6 @@ Se preferir, você pode:
 2. Usar GitHub Desktop para fazer push da pasta `packages` completa
 3. O GitHub Desktop vai enviar apenas os arquivos corretos (respeitando `.gitignore`)
 
+
+
+

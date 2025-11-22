@@ -1,14 +1,19 @@
 import type { NextConfig } from "next";
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const nextConfig: NextConfig = {
-  // Configuração para GitHub Pages
-  // Repositório: arcsight (não é username.github.io)
-  basePath: '/arcsight',
-  output: 'export',
-  images: {
-    unoptimized: true,
-  },
-  trailingSlash: true,
+  // Em desenvolvimento, não usar basePath nem output: 'export'
+  // Essas configurações são apenas para build de produção (GitHub Pages)
+  ...(isProduction ? {
+    // Configuração para GitHub Pages (apenas em produção)
+    basePath: '/arcsight',
+    output: 'export',
+    images: {
+      unoptimized: true,
+    },
+    trailingSlash: true,
+  } : {}),
 };
 
 export default nextConfig;

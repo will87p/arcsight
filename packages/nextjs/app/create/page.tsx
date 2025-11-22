@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import { useContract } from "@/lib/useContract";
 import { useWallet } from "@/lib/useWallet";
+import { imageFileToBase64, validateImageFile, saveMarketImage } from "@/lib/imageStorage";
 
 export default function CreateMarket() {
   const router = useRouter();
@@ -12,10 +13,43 @@ export default function CreateMarket() {
   const { createMarket } = useContract();
   const [description, setDescription] = useState("");
   const [resolutionTime, setResolutionTime] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setError(validation.error || "Erro ao validar imagem");
+      return;
+    }
+
+    setImageFile(file);
+    setError(null);
+
+    try {
+      const base64 = await imageFileToBase64(file);
+      setImagePreview(base64);
+    } catch (err) {
+      setError("Erro ao processar imagem");
+      console.error(err);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,34 +84,35 @@ export default function CreateMarket() {
     setError(null);
     setSuccess(false);
 
-    // Timeout de segurança para não travar a UI
     const timeoutId = setTimeout(() => {
       if (isSubmitting) {
         setIsSubmitting(false);
         setError("A operação está demorando muito. Verifique se a transação foi enviada no MetaMask.");
       }
-    }, 30000); // 30 segundos máximo
+    }, 30000);
 
     try {
+      // Salvar imagem temporariamente no sessionStorage antes de criar o mercado
+      if (imagePreview) {
+        sessionStorage.setItem('pending_market_image', imagePreview);
+        sessionStorage.setItem('pending_market_description', description);
+      }
+
       const hash = await createMarket(description, timestamp);
       clearTimeout(timeoutId);
       
       setTxHash(hash);
       setSuccess(true);
       
-      // Se retornou um hash, a transação foi enviada
       console.log("Transação enviada com sucesso! Hash:", hash);
       
-      // Mostrar mensagem de sucesso e redirecionar após um tempo
       setTimeout(() => {
         router.push("/");
       }, 2000);
     } catch (err: any) {
       clearTimeout(timeoutId);
       
-      // Se o erro menciona timeout mas temos um hash, a transação foi enviada
       if (err.message?.includes("timeout") || err.message?.includes("Timed out")) {
-        // Tentar extrair o hash do erro se disponível
         const hashMatch = err.message?.match(/0x[a-fA-F0-9]{64}/);
         if (hashMatch) {
           setTxHash(hashMatch[0]);
@@ -97,7 +132,6 @@ export default function CreateMarket() {
     }
   }
 
-  // Obter data mínima (agora + 1 hora)
   const minDateTime = new Date(Date.now() + 3600000)
     .toISOString()
     .slice(0, 16);
@@ -143,9 +177,6 @@ export default function CreateMarket() {
                 >
                   {txHash}
                 </a>
-                <p className="text-xs mt-2 text-red-300">
-                  Clique no link acima para verificar o status da transação no explorador.
-                </p>
               </div>
             )}
           </div>
@@ -170,8 +201,66 @@ export default function CreateMarket() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-lg">
-          <div className="mb-6">
+        <form onSubmit={handleSubmit} className="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-lg space-y-6">
+          {/* Upload de Imagem */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Imagem do Mercado (Opcional)
+            </label>
+            <div className="space-y-3">
+              {imagePreview ? (
+                <div className="relative">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-full h-64 object-cover rounded-lg border border-gray-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition"
+                >
+                  <svg
+                    className="mx-auto h-12 w-12 text-gray-400"
+                    stroke="currentColor"
+                    fill="none"
+                    viewBox="0 0 48 48"
+                  >
+                    <path
+                      d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <p className="mt-2 text-sm text-gray-400">
+                    Clique para fazer upload de uma imagem
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    JPG, PNG, WEBP ou GIF (máx. 5MB)
+                  </p>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          <div>
             <label
               htmlFor="description"
               className="block text-sm font-medium text-gray-300 mb-2"
@@ -190,7 +279,7 @@ export default function CreateMarket() {
             />
           </div>
 
-          <div className="mb-6">
+          <div>
             <label
               htmlFor="resolutionTime"
               className="block text-sm font-medium text-gray-300 mb-2"
@@ -234,4 +323,3 @@ export default function CreateMarket() {
     </div>
   );
 }
-

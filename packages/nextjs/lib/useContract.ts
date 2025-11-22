@@ -542,55 +542,134 @@ export function useContract() {
   // Deletar mercado (apenas se não houver apostas)
   const deleteMarket = useCallback(
     async (marketId: number) => {
+      // Verificar conexão novamente antes de executar
       if (!isConnected || !address) {
-        throw new Error("Carteira não conectada");
+        // Tentar obter o endereço diretamente do MetaMask
+        if (typeof window !== "undefined" && window.ethereum) {
+          try {
+            const accounts = await window.ethereum.request({ method: "eth_accounts" });
+            if (accounts && accounts.length > 0) {
+              const currentAddress = accounts[0] as Address;
+              if (!CONTRACT_ADDRESS) {
+                throw new Error("Endereço do contrato não configurado");
+              }
+              return await executeDeleteMarket(marketId, currentAddress);
+            }
+          } catch (err) {
+            console.error("Erro ao verificar contas:", err);
+          }
+        }
+        throw new Error("Carteira não conectada. Por favor, conecte sua carteira primeiro.");
       }
 
       if (!CONTRACT_ADDRESS) {
         throw new Error("Endereço do contrato não configurado");
       }
 
-      try {
-        const walletClient = getWalletClient();
-        const publicClient = getPublicClient();
-
-        const hash = await walletClient.writeContract({
-          address: CONTRACT_ADDRESS as Address,
-          abi: PREDICTION_MARKET_ABI,
-          functionName: "deleteMarket",
-          args: [BigInt(marketId)],
-          account: address,
-        });
-
-        console.log("Exclusão enviada, hash:", hash);
-
-        try {
-          const receipt = await publicClient.waitForTransactionReceipt({
-            hash,
-            timeout: 120_000, // 2 minutos
-            pollingInterval: 2_000,
-          });
-
-          if (receipt.status === "reverted") {
-            throw new Error("Transação foi revertida. Verifique se você é o criador e se não há apostas.");
-          }
-
-          await fetchMarkets();
-          return hash;
-        } catch (waitError: any) {
-          if (waitError.message?.includes("timeout") || waitError.message?.includes("Timed out")) {
-            console.warn("Timeout aguardando confirmação, mas transação foi enviada:", hash);
-            setTimeout(() => fetchMarkets(), 3000);
-            return hash;
-          }
-          throw waitError;
-        }
-      } catch (err: any) {
-        throw new Error(err.message || "Erro ao deletar mercado");
-      }
+      return await executeDeleteMarket(marketId, address);
     },
     [isConnected, address, fetchMarkets]
   );
+
+  // Função auxiliar para executar a exclusão do mercado
+  async function executeDeleteMarket(marketId: number, walletAddress: Address) {
+    try {
+      const publicClient = getPublicClient();
+
+      // Usar eth_sendTransaction diretamente para contornar problemas do MetaMask
+      if (typeof window === "undefined" || !window.ethereum) {
+        throw new Error("MetaMask não está instalado");
+      }
+
+      // Codificar os dados da função
+      const data = encodeFunctionData({
+        abi: PREDICTION_MARKET_ABI,
+        functionName: "deleteMarket",
+        args: [BigInt(marketId)],
+      });
+
+      // Enviar transação diretamente via MetaMask
+      const hash = await window.ethereum.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            from: walletAddress,
+            to: CONTRACT_ADDRESS,
+            data: data,
+            // Não especificamos gas, gasPrice ou nonce - deixa o MetaMask calcular
+          },
+        ],
+      }) as string;
+
+      console.log("Transação de exclusão enviada, hash:", hash);
+      console.log(`[deleteMarket] Endereço do contrato usado: ${CONTRACT_ADDRESS}`);
+      console.log(`[deleteMarket] Market ID: ${marketId}`);
+
+      // Retornar o hash imediatamente e confirmar em background
+      const confirmInBackground = async () => {
+        try {
+          const receipt = await publicClient.waitForTransactionReceipt({
+            hash: hash as `0x${string}`,
+            timeout: 120_000, // 2 minutos
+            pollingInterval: 2_000, // Verificar a cada 2 segundos
+          });
+          
+          console.log("Transação de exclusão confirmada:", receipt);
+          
+          // Verificar se a transação foi bem-sucedida
+          if (receipt.status === "reverted") {
+            console.error("Transação foi revertida");
+            throw new Error("Transação foi revertida. Verifique se você é o criador e se não há apostas.");
+          } else {
+            // Atualizar lista de mercados após confirmação
+            await fetchMarkets();
+          }
+        } catch (waitError: any) {
+          console.warn("Timeout ou erro aguardando confirmação:", waitError.message);
+          
+          // Tentar verificar o status da transação diretamente
+          try {
+            const receipt = await publicClient.getTransactionReceipt({ 
+              hash: hash as `0x${string}` 
+            });
+            
+            if (receipt) {
+              console.log("Transação encontrada no explorador:", receipt);
+              if (receipt.status === "success") {
+                await fetchMarkets();
+              } else {
+                throw new Error("Transação foi revertida. Verifique se você é o criador e se não há apostas.");
+              }
+            }
+          } catch (checkError) {
+            console.log("Transação ainda não confirmada, mas foi enviada");
+          }
+          
+          // Tentar atualizar os mercados após um delay
+          setTimeout(() => fetchMarkets().catch(console.error), 3000);
+        }
+      };
+
+      // Iniciar confirmação em background (não bloqueia)
+      confirmInBackground().catch(console.error);
+      
+      console.log(`[deleteMarket] Transação enviada com hash: ${hash}`);
+      console.log(`[deleteMarket] Endereço do contrato: ${CONTRACT_ADDRESS}`);
+      
+      // Retornar hash imediatamente para não bloquear a UI
+      return hash as `0x${string}`;
+    } catch (err: any) {
+      // Se o erro for de rejeição do usuário
+      if (err.code === 4001 || err.message?.includes("rejected") || err.message?.includes("denied") || err.message?.includes("User rejected")) {
+        throw new Error("Transação cancelada pelo usuário");
+      }
+      // Se o erro for de revert do contrato
+      if (err.message?.includes("revert") || err.message?.includes("reverted")) {
+        throw new Error("Transação foi revertida. Verifique se você é o criador do mercado e se não há apostas.");
+      }
+      throw new Error(err.message || "Erro ao deletar mercado");
+    }
+  }
 
   useEffect(() => {
     if (CONTRACT_ADDRESS) {

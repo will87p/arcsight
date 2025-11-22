@@ -30,16 +30,21 @@ jobs:
           cache: 'npm'
           cache-dependency-path: '**/package-lock.json'
 
-      - name: Install dependencies
+      - name: Install dependencies (root)
         run: npm ci
+        working-directory: .
+
+      - name: Install dependencies (nextjs)
+        run: npm ci
+        working-directory: packages/nextjs
 
       - name: Build Next.js
         run: npm run build
         working-directory: packages/nextjs
         env:
+          NODE_ENV: production
           # Variáveis de ambiente para o build
-          # Valores padrão serão usados se os secrets não estiverem configurados
-          NEXT_PUBLIC_CONTRACT_ADDRESS: ${{ secrets.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x63D158dA4c1C33A8F0F6726Ef698058b535B76fC' }}
+          NEXT_PUBLIC_CONTRACT_ADDRESS: ${{ secrets.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x6E69202825871e072CFB5dBcEe4Eb341F958cF88' }}
           NEXT_PUBLIC_NETWORK: ${{ secrets.NEXT_PUBLIC_NETWORK || 'arc' }}
           NEXT_PUBLIC_ARC_RPC_URL: ${{ secrets.NEXT_PUBLIC_ARC_RPC_URL || 'https://rpc.testnet.arc.network' }}
           NEXT_PUBLIC_ARC_CHAIN_ID: ${{ secrets.NEXT_PUBLIC_ARC_CHAIN_ID || '5042002' }}
@@ -64,4 +69,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
