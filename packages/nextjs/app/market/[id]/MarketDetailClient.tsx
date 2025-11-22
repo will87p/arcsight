@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import { useContract, Market } from "@/lib/useContract";
@@ -22,7 +22,7 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
   // Estado para armazenar o marketId extraído da URL
   const [extractedMarketId, setExtractedMarketId] = useState<number | null>(null);
 
-  // Função para extrair o ID da URL
+  // Função para extrair o ID da URL (memoizada para evitar loops)
   const extractMarketIdFromUrl = useCallback(() => {
     if (propMarketId) {
       setExtractedMarketId(propMarketId);
@@ -55,7 +55,7 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
       }
     }
     
-    // Fallback: tentar pegar da window.location
+    // Fallback: tentar pegar da window.location (apenas uma vez)
     if (!foundId && typeof window !== 'undefined') {
       const urlMatch = window.location.pathname.match(/\/market\/(\d+)/);
       if (urlMatch && urlMatch[1]) {
@@ -66,7 +66,11 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
       }
     }
     
-    setExtractedMarketId(foundId);
+    // Só atualizar se o ID mudou (evita loops)
+    setExtractedMarketId(prev => {
+      if (prev === foundId) return prev;
+      return foundId;
+    });
   }, [propMarketId, pathname]);
 
   // Extrair o ID quando o componente montar ou quando pathname/propMarketId mudar
@@ -95,40 +99,61 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [winningOutcome, setWinningOutcome] = useState<boolean | null>(null);
+  const isLoadingMarketRef = useRef(false); // Ref para evitar múltiplas chamadas simultâneas
 
-  useEffect(() => {
-    if (marketId) {
-      loadMarket();
-    }
-  }, [marketId, address]);
-
-  async function loadMarket() {
+  // Memoizar loadMarket para evitar recriações desnecessárias
+  const loadMarket = useCallback(async () => {
     if (!marketId) {
       setError("ID do mercado não encontrado");
       setIsLoading(false);
       return;
     }
     
+    // Evitar múltiplas chamadas simultâneas usando ref
+    if (isLoadingMarketRef.current) {
+      console.log('[MarketDetailClient] loadMarket já em execução, ignorando...');
+      return;
+    }
+    
+    isLoadingMarketRef.current = true;
     setIsLoading(true);
     setError(null);
+    
     try {
+      console.log('[MarketDetailClient] Carregando mercado:', marketId);
       const marketData = await fetchMarket(marketId);
+      
       if (!marketData || marketData.id === BigInt(0)) {
         setError("Mercado não encontrado");
         setMarket(null);
       } else {
         setMarket(marketData);
         if (isConnected && address && marketId) {
-          const bets = await getUserBets(marketId);
-          setUserBets(bets);
+          try {
+            const bets = await getUserBets(marketId);
+            setUserBets(bets);
+          } catch (betError) {
+            console.warn('[MarketDetailClient] Erro ao carregar apostas do usuário:', betError);
+            // Não bloquear se falhar ao carregar apostas
+          }
         }
       }
     } catch (err: any) {
+      console.error('[MarketDetailClient] Erro ao carregar mercado:', err);
       setError(err.message || "Erro ao carregar mercado");
     } finally {
       setIsLoading(false);
+      isLoadingMarketRef.current = false;
     }
-  }
+  }, [marketId, address, isConnected, fetchMarket, getUserBets]);
+
+  useEffect(() => {
+    if (marketId) {
+      loadMarket();
+    } else {
+      setIsLoading(false);
+    }
+  }, [marketId, loadMarket]);
 
   async function handleBet(outcome: boolean) {
     if (!marketId) {

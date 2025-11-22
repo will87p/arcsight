@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { formatEtherValue, formatTimeRemaining, getMarketUrl, getFullMarketUrl } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { formatEtherValue, formatTimeRemaining, getMarketUrl } from "@/lib/utils";
 import { Market } from "@/lib/useContract";
 import { useWallet } from "@/lib/useWallet";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
@@ -15,6 +16,7 @@ interface MarketCardProps {
 }
 
 export default function MarketCard({ market, onDelete, deletingMarketId }: MarketCardProps) {
+  const router = useRouter();
   const { isConnected, address } = useWallet();
   const { t } = useLanguage();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -93,8 +95,8 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
       return;
     }
 
-    // Usar getFullMarketUrl para garantir que o basePath seja incluído
-    window.location.href = getFullMarketUrl(market.id);
+    // Usar router.push para navegação suave (sem reload completo)
+    router.push(getMarketUrl(market.id));
   };
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -118,8 +120,7 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
 
   return (
     <div className="relative group">
-      <Link href={getMarketUrl(market.id)} className="block">
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:border-blue-500/50 cursor-pointer h-full flex flex-col">
+      <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:border-blue-500/50 cursor-pointer h-full flex flex-col">
           {/* Imagem do mercado - estilo Kalshi */}
           <div className="relative h-48 bg-gradient-to-br from-blue-600/20 to-purple-600/20 overflow-hidden">
             {imageUrl && imageUrl.startsWith('http') ? (
@@ -229,7 +230,6 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
             </div>
           </div>
         </div>
-      </Link>
     </div>
   );
 }
