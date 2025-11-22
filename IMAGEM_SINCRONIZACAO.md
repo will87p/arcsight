@@ -56,3 +56,4 @@ NEXT_PUBLIC_JSONBIN_API_KEY=sua_chave_jsonbin (opcional)
 
 **Com ImgBB + JSONBin:** Sincronização completa - todos veem todas as imagens.
 
+

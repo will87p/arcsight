@@ -52,3 +52,4 @@ Abra o console (F12) e procure por:
 - `✅ JSONBin configurado` → Funcionando!
 - `✅ Imagem do mercado X sincronizada no JSONBin` → Imagem compartilhada!
 
+

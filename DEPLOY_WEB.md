@@ -62,3 +62,4 @@ Certifique-se de que estes arquivos estão no repositório:
 - ✅ `packages/nextjs/app/market/[id]/page.tsx`
 - ✅ `.github/workflows/deploy.yml`
 
+

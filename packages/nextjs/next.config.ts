@@ -12,7 +12,9 @@ const nextConfig: NextConfig = {
     images: {
       unoptimized: true,
     },
-    trailingSlash: true,
+    // Removido trailingSlash para evitar problemas com GitHub Pages
+    // O Next.js gera /market/10.html em vez de /market/10/index.html
+    trailingSlash: false,
   } : {}),
 };
 

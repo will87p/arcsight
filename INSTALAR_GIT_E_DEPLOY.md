@@ -67,3 +67,4 @@ Certifique-se de que estes arquivos estão no repositório:
 - ❌ `.env.local`
 - ❌ Arquivos de cache
 
+

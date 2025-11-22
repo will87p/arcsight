@@ -42,3 +42,4 @@ style: ajustar layout do header
 - Summary: Uma linha descritiva do que foi feito
 - Description: Detalhes opcionais (pode deixar vazio)
 
+

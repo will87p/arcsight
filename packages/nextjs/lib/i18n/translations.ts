@@ -132,6 +132,8 @@ export interface Translations {
     deleteMarket: string;
     deleteConfirm: string;
     cannotUndo: string;
+    notFound: string;
+    backToHome: string;
   };
   
   // Footer
@@ -263,6 +265,8 @@ export const translations: Record<Language, Translations> = {
       deleteMarket: 'Deletar mercado',
       deleteConfirm: 'Tem certeza que deseja deletar este mercado?',
       cannotUndo: 'Esta ação não pode ser desfeita.',
+      notFound: 'Página não encontrada',
+      backToHome: 'Voltar para a página inicial',
     },
     footer: {
       createdBy: 'Criado por',
@@ -390,6 +394,8 @@ export const translations: Record<Language, Translations> = {
       deleteMarket: 'Delete market',
       deleteConfirm: 'Are you sure you want to delete this market?',
       cannotUndo: 'This action cannot be undone.',
+      notFound: 'Page not found',
+      backToHome: 'Back to home page',
     },
     footer: {
       createdBy: 'Created by',

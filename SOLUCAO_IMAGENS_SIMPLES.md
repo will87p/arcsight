@@ -74,3 +74,4 @@ NEXT_PUBLIC_JSONBIN_BIN_ID=seu_bin_id
 3. Abra em outro navegador/computador
 4. A imagem deve aparecer para todos
 
+

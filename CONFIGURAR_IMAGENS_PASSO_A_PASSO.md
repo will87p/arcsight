@@ -79,3 +79,4 @@ Abra o console (F12) e procure por:
 - Verifique os logs no console
 - Certifique-se de que o Bin é público
 
+

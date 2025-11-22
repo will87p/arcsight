@@ -53,3 +53,4 @@ Se preferir usar outro serviço:
 - **Cloudinary** (plano gratuito disponível)
 - **AWS S3** (pago, mas muito confiável)
 
+

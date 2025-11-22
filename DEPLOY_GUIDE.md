@@ -71,3 +71,4 @@ Se o deploy falhar:
 3. Verifique se todas as dependências estão instaladas
 4. Confirme que o `next.config.ts` está configurado para produção
 
+

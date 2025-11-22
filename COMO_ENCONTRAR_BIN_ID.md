@@ -46,3 +46,4 @@ NEXT_PUBLIC_JSONBIN_BIN_ID=65a1b2c3d4e5f6g7h8i9j0k
 - O JSON inicial deve ter a estrutura: `{ "images": [] }`
 - O ID é a parte longa após `/bins/` na URL
 
+

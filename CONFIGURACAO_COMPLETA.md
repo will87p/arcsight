@@ -55,3 +55,4 @@ No console do navegador (F12), você deve ver:
 
 Se aparecer `⚠️ JSONBin não configurado`, verifique se adicionou as variáveis no `.env.local` e reiniciou o servidor.
 
+
