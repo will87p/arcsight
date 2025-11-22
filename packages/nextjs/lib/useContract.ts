@@ -539,6 +539,59 @@ export function useContract() {
     [isConnected, address]
   );
 
+  // Deletar mercado (apenas se não houver apostas)
+  const deleteMarket = useCallback(
+    async (marketId: number) => {
+      if (!isConnected || !address) {
+        throw new Error("Carteira não conectada");
+      }
+
+      if (!CONTRACT_ADDRESS) {
+        throw new Error("Endereço do contrato não configurado");
+      }
+
+      try {
+        const walletClient = getWalletClient();
+        const publicClient = getPublicClient();
+
+        const hash = await walletClient.writeContract({
+          address: CONTRACT_ADDRESS as Address,
+          abi: PREDICTION_MARKET_ABI,
+          functionName: "deleteMarket",
+          args: [BigInt(marketId)],
+          account: address,
+        });
+
+        console.log("Exclusão enviada, hash:", hash);
+
+        try {
+          const receipt = await publicClient.waitForTransactionReceipt({
+            hash,
+            timeout: 120_000, // 2 minutos
+            pollingInterval: 2_000,
+          });
+
+          if (receipt.status === "reverted") {
+            throw new Error("Transação foi revertida. Verifique se você é o criador e se não há apostas.");
+          }
+
+          await fetchMarkets();
+          return hash;
+        } catch (waitError: any) {
+          if (waitError.message?.includes("timeout") || waitError.message?.includes("Timed out")) {
+            console.warn("Timeout aguardando confirmação, mas transação foi enviada:", hash);
+            setTimeout(() => fetchMarkets(), 3000);
+            return hash;
+          }
+          throw waitError;
+        }
+      } catch (err: any) {
+        throw new Error(err.message || "Erro ao deletar mercado");
+      }
+    },
+    [isConnected, address, fetchMarkets]
+  );
+
   useEffect(() => {
     if (CONTRACT_ADDRESS) {
       fetchMarkets();
@@ -556,6 +609,7 @@ export function useContract() {
     resolveMarket,
     claimWinnings,
     getUserBets,
+    deleteMarket,
   };
 }
 
