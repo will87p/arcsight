@@ -37,6 +37,21 @@ export default function CreateMarket() {
     try {
       const base64 = await imageFileToBase64(file);
       setImagePreview(base64);
+      
+      // Fazer upload imediatamente para ImgBB (se configurado)
+      // Isso garante que a URL esteja disponível quando o mercado for criado
+      try {
+        const { uploadImageToImgBB } = await import("@/lib/imageStorage");
+        const uploadedUrl = await uploadImageToImgBB(base64);
+        if (uploadedUrl) {
+          // Salvar URL do ImgBB no sessionStorage para usar depois
+          sessionStorage.setItem('pending_image_url', uploadedUrl);
+          console.log('[handleImageChange] Imagem enviada para ImgBB:', uploadedUrl);
+        }
+      } catch (uploadError) {
+        console.warn('[handleImageChange] Erro ao fazer upload (continuando com base64 local):', uploadError);
+        // Continuar com base64 local se upload falhar
+      }
     } catch (err) {
       setError("Erro ao processar imagem");
       console.error(err);
@@ -46,6 +61,7 @@ export default function CreateMarket() {
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
+    sessionStorage.removeItem('pending_image_url'); // Limpar URL do ImgBB também
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -93,20 +109,20 @@ export default function CreateMarket() {
     }, 60000); // Aumentar para 60 segundos
 
     try {
-      // Fazer upload da imagem antes de criar o mercado
-      let uploadedImageUrl: string | null = null;
+      // Salvar imagem temporariamente no sessionStorage antes de criar o mercado
+      // Priorizar URL do ImgBB se disponível (já foi feito upload quando imagem foi selecionada)
       if (imagePreview) {
-        try {
-          console.log("[handleSubmit] Fazendo upload da imagem...");
-          const { saveMarketImage } = await import("@/lib/imageStorage");
-          // Salvar temporariamente no sessionStorage enquanto faz upload
-          sessionStorage.setItem('pending_market_image', imagePreview);
-          sessionStorage.setItem('pending_market_description', description);
-          
-          // O upload será feito após a criação do mercado (em background)
-          // para não bloquear a criação
-        } catch (uploadError) {
-          console.warn("[handleSubmit] Erro ao fazer upload da imagem (continuando sem imagem):", uploadError);
+        const uploadedUrl = sessionStorage.getItem('pending_image_url');
+        const imageToSave = uploadedUrl || imagePreview; // Usar URL do ImgBB se disponível
+        
+        sessionStorage.setItem('pending_market_image', imageToSave);
+        sessionStorage.setItem('pending_market_description', description);
+        
+        console.log("[handleSubmit] Imagem preparada:", uploadedUrl ? "URL do ImgBB" : "Base64 local");
+        
+        // Limpar URL temporária (será usada agora)
+        if (uploadedUrl) {
+          sessionStorage.removeItem('pending_image_url');
         }
       }
 

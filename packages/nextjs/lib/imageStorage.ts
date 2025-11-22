@@ -72,9 +72,9 @@ export async function saveMarketImage(marketId: number, base64Image: string): Pr
     // Usar URL do ImgBB se disponível, senão usar base64 local como fallback
     const finalImageUrl = imageUrl || base64Image;
     
-    // Salvar no localStorage
-    const images = getMarketImages();
-    const existingIndex = images.findIndex(img => img.marketId === marketId);
+    // Salvar no localStorage (local)
+    const localImages = getMarketImages();
+    const existingLocalIndex = localImages.findIndex(img => img.marketId === marketId);
     
     const marketImage: MarketImage = {
       marketId,
@@ -82,13 +82,35 @@ export async function saveMarketImage(marketId: number, base64Image: string): Pr
       timestamp: Date.now(),
     };
 
-    if (existingIndex >= 0) {
-      images[existingIndex] = marketImage;
+    if (existingLocalIndex >= 0) {
+      localImages[existingLocalIndex] = marketImage;
     } else {
-      images.push(marketImage);
+      localImages.push(marketImage);
     }
 
-    localStorage.setItem('arcsight_market_images', JSON.stringify(images));
+    localStorage.setItem('arcsight_market_images', JSON.stringify(localImages));
+    
+    // Tentar salvar no JSONBin (compartilhado) se configurado
+    if (JSONBIN_URL && imageUrl) {
+      try {
+        // Buscar imagens existentes do JSONBin
+        const sharedImages = await fetchSharedImages();
+        
+        // Adicionar ou atualizar a imagem
+        const existingSharedIndex = sharedImages.findIndex(img => img.marketId === marketId);
+        if (existingSharedIndex >= 0) {
+          sharedImages[existingSharedIndex] = marketImage;
+        } else {
+          sharedImages.push(marketImage);
+        }
+        
+        // Salvar de volta no JSONBin
+        await saveSharedImages(sharedImages);
+        console.log(`[saveMarketImage] Imagem do mercado ${marketId} sincronizada no JSONBin`);
+      } catch (syncError) {
+        console.warn(`[saveMarketImage] Erro ao sincronizar no JSONBin (continuando):`, syncError);
+      }
+    }
     
     if (imageUrl) {
       console.log(`[saveMarketImage] Imagem do mercado ${marketId} salva no ImgBB: ${imageUrl}`);
@@ -119,17 +141,105 @@ export async function saveMarketImage(marketId: number, base64Image: string): Pr
 }
 
 /**
- * Obtém a imagem de um mercado
- * Primeiro tenta buscar do localStorage, depois tenta buscar de uma API compartilhada
+ * Busca imagens do JSONBin (armazenamento compartilhado)
  */
-export function getMarketImage(marketId: number): string | null {
+async function fetchSharedImages(): Promise<MarketImage[]> {
+  if (!JSONBIN_URL) {
+    return [];
+  }
+
   try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (JSONBIN_API_KEY) {
+      headers['X-Master-Key'] = JSONBIN_API_KEY;
+    }
+
+    const response = await fetch(`${JSONBIN_URL}/latest`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      console.warn('[fetchSharedImages] Erro ao buscar imagens compartilhadas:', response.statusText);
+      return [];
+    }
+
+    const data = await response.json();
+    const images = data.record?.images || data.record || [];
+    
+    console.log(`[fetchSharedImages] ${images.length} imagens encontradas no JSONBin`);
+    return images as MarketImage[];
+  } catch (error) {
+    console.warn('[fetchSharedImages] Erro ao buscar imagens compartilhadas:', error);
+    return [];
+  }
+}
+
+/**
+ * Salva imagens no JSONBin (armazenamento compartilhado)
+ */
+async function saveSharedImages(images: MarketImage[]): Promise<void> {
+  if (!JSONBIN_URL) {
+    return;
+  }
+
+  try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (JSONBIN_API_KEY) {
+      headers['X-Master-Key'] = JSONBIN_API_KEY;
+    }
+
+    const response = await fetch(JSONBIN_URL, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ images }),
+    });
+
+    if (!response.ok) {
+      console.warn('[saveSharedImages] Erro ao salvar imagens compartilhadas:', response.statusText);
+      return;
+    }
+
+    console.log('[saveSharedImages] Imagens salvas no JSONBin com sucesso');
+  } catch (error) {
+    console.warn('[saveSharedImages] Erro ao salvar imagens compartilhadas:', error);
+  }
+}
+
+/**
+ * Obtém a imagem de um mercado
+ * Primeiro tenta buscar do JSONBin (compartilhado), depois do localStorage (local)
+ */
+export async function getMarketImage(marketId: number): Promise<string | null> {
+  try {
+    // Primeiro, tentar buscar do JSONBin (compartilhado)
+    if (JSONBIN_URL) {
+      const sharedImages = await fetchSharedImages();
+      const sharedImage = sharedImages.find(img => img.marketId === marketId);
+      if (sharedImage?.imageUrl) {
+        // Verificar se é uma URL válida (não base64 local)
+        if (sharedImage.imageUrl.startsWith('http')) {
+          return sharedImage.imageUrl;
+        }
+      }
+    }
+
+    // Fallback: buscar do localStorage (local)
     const images = getMarketImages();
     const marketImage = images.find(img => img.marketId === marketId);
     return marketImage?.imageUrl || null;
   } catch (error) {
     console.error('Erro ao obter imagem do mercado:', error);
-    return null;
+    // Fallback para localStorage
+    const images = getMarketImages();
+    const marketImage = images.find(img => img.marketId === marketId);
+    return marketImage?.imageUrl || null;
   }
 }
 

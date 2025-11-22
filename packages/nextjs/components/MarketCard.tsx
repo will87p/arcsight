@@ -25,8 +25,11 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
 
   // Carregar imagem do mercado
   useEffect(() => {
-    const image = getMarketImage(Number(market.id));
-    setImageUrl(image);
+    const loadImage = async () => {
+      const image = await getMarketImage(Number(market.id));
+      setImageUrl(image);
+    };
+    loadImage();
   }, [market.id]);
 
   // Calcular probabilidades
