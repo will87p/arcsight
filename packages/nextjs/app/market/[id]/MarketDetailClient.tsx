@@ -60,7 +60,7 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
         setMarket(null);
       } else {
         setMarket(marketData);
-        if (isConnected && address) {
+        if (isConnected && address && marketId) {
           const bets = await getUserBets(marketId);
           setUserBets(bets);
         }
@@ -73,6 +73,11 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
   }
 
   async function handleBet(outcome: boolean) {
+    if (!marketId) {
+      setError("ID do mercado inválido");
+      return;
+    }
+
     if (!isConnected) {
       setError("Por favor, conecte sua carteira primeiro");
       return;
@@ -111,6 +116,11 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
   }
 
   async function handleResolve() {
+    if (!marketId) {
+      setError("ID do mercado inválido");
+      return;
+    }
+
     if (!isConnected || !market) {
       setError("Por favor, conecte sua carteira primeiro");
       return;
@@ -143,6 +153,11 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
   }
 
   async function handleClaim() {
+    if (!marketId) {
+      setError("ID do mercado inválido");
+      return;
+    }
+
     if (!isConnected) {
       setError("Por favor, conecte sua carteira primeiro");
       return;
