@@ -1,18 +1,40 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import { useContract } from "@/lib/useContract";
+import { useWallet } from "@/lib/useWallet";
 import { formatEtherValue, formatTimeRemaining } from "@/lib/utils";
 
 export default function Home() {
-  const { markets, isLoading, error, fetchMarkets } = useContract();
+  const { markets, isLoading, error, fetchMarkets, deleteMarket } = useContract();
+  const { address, isConnected } = useWallet();
+  const [deletingMarketId, setDeletingMarketId] = useState<number | null>(null);
 
   // Carregar mercados quando a página carrega
   useEffect(() => {
     fetchMarkets();
   }, [fetchMarkets]);
+
+  async function handleDeleteMarket(marketId: number, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!confirm("Tem certeza que deseja deletar este mercado? Esta ação não pode ser desfeita.")) {
+      return;
+    }
+
+    setDeletingMarketId(marketId);
+    try {
+      await deleteMarket(marketId);
+      alert("Mercado deletado com sucesso!");
+    } catch (err: any) {
+      alert(err.message || "Erro ao deletar mercado");
+    } finally {
+      setDeletingMarketId(null);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -27,16 +49,6 @@ export default function Home() {
             >
               Criar Novo Mercado
             </Link>
-            <button
-              onClick={() => {
-                console.log("[Home] Botão de atualizar clicado");
-                fetchMarkets();
-              }}
-              className="px-6 py-4 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition font-medium"
-              title="Atualizar lista de mercados"
-            >
-              🔄 Atualizar
-            </button>
           </div>
         </div>
 
@@ -75,39 +87,57 @@ export default function Home() {
               const timeRemaining = isResolved
                 ? "Resolvido"
                 : formatTimeRemaining(market.resolutionTime);
+              
+              // Verificar se pode deletar: é o criador, não está resolvido e não tem apostas
+              const canDelete = isConnected && 
+                address?.toLowerCase() === market.creator.toLowerCase() &&
+                !isResolved && 
+                totalPot === BigInt(0);
+              const isDeleting = deletingMarketId === Number(market.id);
 
               return (
-                <Link
-                  key={market.id.toString()}
-                  href={`/market/${market.id}`}
-                  className="block"
-                >
-                  <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition hover:border-blue-500 cursor-pointer h-full flex flex-col">
-                    <h3 className="text-xl font-semibold text-white mb-4 line-clamp-2 flex-grow">
-                      {market.description}
-                    </h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-400">Pote Total:</span>
-                        <span className="text-lg font-bold text-blue-400">
-                          {formatEtherValue(totalPot)} USDC
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-400">Status:</span>
-                        <span
-                          className={`text-sm font-medium ${
-                            isResolved
-                              ? "text-green-400"
-                              : "text-yellow-400"
-                          }`}
-                        >
-                          {isResolved ? "Resolvido" : timeRemaining}
-                        </span>
+                <div key={market.id.toString()} className="relative">
+                  <Link
+                    href={`/market/${market.id}`}
+                    className="block"
+                  >
+                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition hover:border-blue-500 cursor-pointer h-full flex flex-col">
+                      <h3 className="text-xl font-semibold text-white mb-4 line-clamp-2 flex-grow">
+                        {market.description}
+                      </h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-400">Pote Total:</span>
+                          <span className="text-lg font-bold text-blue-400">
+                            {formatEtherValue(totalPot)} USDC
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-400">Status:</span>
+                          <span
+                            className={`text-sm font-medium ${
+                              isResolved
+                                ? "text-green-400"
+                                : "text-yellow-400"
+                            }`}
+                          >
+                            {isResolved ? "Resolvido" : timeRemaining}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                  {canDelete && (
+                    <button
+                      onClick={(e) => handleDeleteMarket(Number(market.id), e)}
+                      disabled={isDeleting}
+                      className="absolute top-2 right-2 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                      title="Deletar mercado (apenas se não houver apostas)"
+                    >
+                      {isDeleting ? "Deletando..." : "🗑️"}
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
