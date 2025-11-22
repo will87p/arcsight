@@ -51,18 +51,7 @@ export function formatEtherValue(value: bigint | string): string {
 // Helper para gerar URLs que respeitam o basePath
 export function getMarketUrl(marketId: number | bigint): string {
   // Em produção no GitHub Pages, o basePath é /arcsight
-  // Verificamos se estamos em produção pela URL ou pela variável de ambiente
-  let basePath = '';
-  
-  if (typeof window !== 'undefined') {
-    // Se a URL atual contém /arcsight, usamos o basePath
-    if (window.location.pathname.startsWith('/arcsight')) {
-      basePath = '/arcsight';
-    }
-  } else {
-    // No servidor, verificar variável de ambiente
-    basePath = process.env.NODE_ENV === 'production' ? '/arcsight' : '';
-  }
-  
-  return `${basePath}/market/${Number(marketId)}`;
+  // Mas o Next.js Link já adiciona o basePath automaticamente, então não precisamos adicionar manualmente
+  // Retornamos apenas o caminho relativo e deixamos o Next.js cuidar do basePath
+  return `/market/${Number(marketId)}`;
 }
