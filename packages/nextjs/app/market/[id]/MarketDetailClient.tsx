@@ -177,27 +177,55 @@ export default function MarketDetailClient({ marketId: propMarketId }: MarketDet
       setBetAmount("");
       await loadMarket();
     } catch (err: any) {
-      console.error("Erro ao fazer aposta:", err);
+      console.error("[handleBet] Erro completo ao fazer aposta:", err);
+      console.error("[handleBet] Tipo do erro:", typeof err);
+      console.error("[handleBet] Código do erro:", err.code);
+      console.error("[handleBet] Mensagem do erro:", err.message);
+      console.error("[handleBet] Stack do erro:", err.stack);
       
       // Mensagens de erro mais específicas
       let errorMessage = language === 'pt-BR' ? "Erro ao fazer aposta" : "Error placing bet";
       
-      if (err.message?.includes("insufficient funds") || err.message?.includes("saldo") || err.message?.includes("balance")) {
+      const errMsg = err.message?.toLowerCase() || '';
+      const errCode = err.code?.toString() || '';
+      
+      if (errMsg.includes("insufficient funds") || 
+          errMsg.includes("saldo") || 
+          errMsg.includes("balance") ||
+          errMsg.includes("insufficient balance")) {
         errorMessage = language === 'pt-BR' 
           ? "Saldo insuficiente. Verifique se você tem USDC suficiente na carteira."
           : "Insufficient balance. Please check if you have enough USDC in your wallet.";
-      } else if (err.message?.includes("rejected") || err.message?.includes("User rejected") || err.message?.includes("denied")) {
+      } else if (errMsg.includes("rejected") || 
+                 errMsg.includes("user rejected") || 
+                 errMsg.includes("denied") ||
+                 errCode === "4001") {
         errorMessage = language === 'pt-BR' ? "Transação cancelada pelo usuário" : "Transaction cancelled by user";
-      } else if (err.message?.includes("revert") || err.message?.includes("reverted")) {
+      } else if (errMsg.includes("revert") || errMsg.includes("reverted")) {
         errorMessage = language === 'pt-BR'
           ? "Transação revertida. Verifique se o mercado ainda está aberto e se você tem saldo suficiente."
           : "Transaction reverted. Please check if the market is still open and if you have sufficient balance.";
-      } else if (err.message?.includes("invalid value") || err.message?.includes("invalid amount") || err.message?.includes("Valor inválido")) {
+      } else if (errMsg.includes("invalid value") || 
+                 errMsg.includes("invalid amount") || 
+                 errMsg.includes("valor inválido") ||
+                 errMsg.includes("erro ao converter valor")) {
         errorMessage = language === 'pt-BR' 
           ? "Valor inválido. Use apenas números (ex: 0.1 ou 1.5)"
           : "Invalid value. Use only numbers (e.g., 0.1 or 1.5)";
+      } else if (errMsg.includes("network") || errMsg.includes("chain")) {
+        errorMessage = language === 'pt-BR'
+          ? "Erro de rede. Verifique se está conectado à rede Arc Testnet."
+          : "Network error. Please check if you are connected to Arc Testnet.";
+      } else if (errMsg.includes("carteira não conectada") || errMsg.includes("wallet not connected")) {
+        errorMessage = language === 'pt-BR'
+          ? "Carteira não conectada. Por favor, conecte sua carteira primeiro."
+          : "Wallet not connected. Please connect your wallet first.";
       } else if (err.message) {
         errorMessage = err.message;
+      } else {
+        errorMessage = language === 'pt-BR'
+          ? `Erro desconhecido: ${JSON.stringify(err)}`
+          : `Unknown error: ${JSON.stringify(err)}`;
       }
       
       setError(errorMessage);

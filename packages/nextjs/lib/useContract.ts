@@ -418,15 +418,41 @@ export function useContract() {
         console.log(`[placeBet] Data: ${data}`);
 
         // Enviar transação diretamente via MetaMask
-        // Converter valor para hex (remover '0x' se já tiver e adicionar novamente)
-        const valueHex = value.toString(16).startsWith('0x') 
-          ? value.toString(16) 
-          : `0x${value.toString(16)}`;
+        // Converter valor para hex (formato que o MetaMask espera)
+        // O valor deve ser uma string hex sem zeros à esquerda desnecessários
+        let valueHex: string;
+        try {
+          // Converter bigint para hex string
+          const hexString = value.toString(16);
+          // Garantir que começa com 0x
+          valueHex = hexString.startsWith('0x') ? hexString : `0x${hexString}`;
+          // Remover zeros à esquerda desnecessários, mas manter pelo menos "0x0"
+          if (valueHex === '0x0' || value === BigInt(0)) {
+            valueHex = '0x0';
+          }
+        } catch (hexError: any) {
+          console.error("[placeBet] Erro ao converter valor para hex:", hexError);
+          throw new Error(`Erro ao converter valor para hex: ${hexError.message || "Valor inválido"}`);
+        }
         
         console.log(`[placeBet] Valor em hex: ${valueHex}`);
+        console.log(`[placeBet] Valor em wei (decimal): ${value.toString()}`);
+        
+        // Validar parâmetros antes de enviar
+        if (!address || !CONTRACT_ADDRESS || !data) {
+          throw new Error("Parâmetros inválidos para a transação");
+        }
         
         let hash: string;
         try {
+          console.log("[placeBet] Enviando transação para MetaMask...");
+          console.log("[placeBet] Parâmetros:", {
+            from: address,
+            to: CONTRACT_ADDRESS,
+            value: valueHex,
+            dataLength: data.length
+          });
+          
           hash = await window.ethereum.request({
             method: "eth_sendTransaction",
             params: [
@@ -438,13 +464,38 @@ export function useContract() {
               },
             ],
           }) as string;
+          
+          console.log("[placeBet] Hash recebido do MetaMask:", hash);
         } catch (requestError: any) {
-          console.error("[placeBet] Erro ao enviar transação:", requestError);
+          console.error("[placeBet] Erro completo ao enviar transação:", requestError);
+          console.error("[placeBet] Código do erro:", requestError.code);
+          console.error("[placeBet] Mensagem do erro:", requestError.message);
+          console.error("[placeBet] Stack do erro:", requestError.stack);
+          
           // Se o erro for de rejeição do usuário
-          if (requestError.code === 4001 || requestError.message?.includes("rejected") || requestError.message?.includes("denied") || requestError.message?.includes("User rejected")) {
+          if (requestError.code === 4001 || 
+              requestError.message?.includes("rejected") || 
+              requestError.message?.includes("denied") || 
+              requestError.message?.includes("User rejected") ||
+              requestError.message?.includes("user rejected")) {
             throw new Error("Transação cancelada pelo usuário");
           }
-          throw requestError;
+          
+          // Se o erro for de saldo insuficiente
+          if (requestError.message?.includes("insufficient funds") || 
+              requestError.message?.includes("insufficient balance") ||
+              requestError.code === -32000) {
+            throw new Error("Saldo insuficiente. Verifique se você tem USDC suficiente na carteira.");
+          }
+          
+          // Se o erro for de rede
+          if (requestError.message?.includes("network") || 
+              requestError.message?.includes("chain")) {
+            throw new Error("Erro de rede. Verifique se está conectado à rede Arc Testnet.");
+          }
+          
+          // Erro genérico com mensagem do MetaMask
+          throw new Error(requestError.message || "Erro ao enviar transação para MetaMask");
         }
 
         if (!hash || hash === '0x' || hash.length !== 66) {
