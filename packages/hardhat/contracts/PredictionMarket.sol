@@ -58,6 +58,11 @@ contract PredictionMarket {
         uint256 amount
     );
 
+    event MarketDeleted(
+        uint256 indexed marketId,
+        address indexed creator
+    );
+
     /**
      * @dev Cria um novo mercado de previsão
      * @param _description Descrição do evento/previsão
@@ -217,6 +222,32 @@ contract PredictionMarket {
 
         // Emite o evento
         emit WinningsClaimed(_marketId, msg.sender, winnings);
+    }
+
+    /**
+     * @dev Permite que o criador delete um mercado que ainda não tem apostas
+     * @param _marketId ID do mercado a ser deletado
+     */
+    function deleteMarket(uint256 _marketId) external {
+        // Requer que o mercado exista
+        Market storage market = markets[_marketId];
+        require(market.id != 0, "Market does not exist");
+
+        // Requer que o chamador seja o criador do mercado
+        require(msg.sender == market.creator, "Only creator can delete market");
+
+        // Requer que o mercado não esteja resolvido
+        require(!market.resolved, "Cannot delete resolved market");
+
+        // Requer que não haja apostas (pote total deve ser zero)
+        uint256 totalPot = market.totalYesAmount + market.totalNoAmount;
+        require(totalPot == 0, "Cannot delete market with bets");
+
+        // Deleta o mercado (zera o ID)
+        delete markets[_marketId];
+
+        // Emite o evento
+        emit MarketDeleted(_marketId, msg.sender);
     }
 
     /**
