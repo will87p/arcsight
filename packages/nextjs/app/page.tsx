@@ -122,13 +122,15 @@ export default function Home() {
             if (existingIndex >= 0) {
               const existing = mergedImages[existingIndex];
               // Sempre atualizar se a imagem compartilhada for uma URL (mesmo que já exista)
-              if (sharedImage.imageUrl.startsWith('http')) {
-                mergedImages[existingIndex] = sharedImage;
-                updatedCount++;
-              }
+              // Isso garante que imagens de outros usuários sejam atualizadas
+              mergedImages[existingIndex] = sharedImage;
+              updatedCount++;
+              console.log(`[page.tsx] Atualizando imagem do mercado ${sharedImage.marketId}:`, sharedImage.imageUrl.substring(0, 50) + '...');
             } else {
+              // Adicionar nova imagem compartilhada (de outros usuários)
               mergedImages.push(sharedImage);
               addedCount++;
+              console.log(`[page.tsx] Adicionando nova imagem do mercado ${sharedImage.marketId}:`, sharedImage.imageUrl.substring(0, 50) + '...');
             }
           });
           

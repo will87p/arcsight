@@ -25,17 +25,21 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
 
   // Carregar imagem do mercado
   useEffect(() => {
+    const marketId = Number(market.id);
+    
     const loadImage = async () => {
       try {
-        const marketId = Number(market.id);
+        console.log(`[MarketCard ${marketId}] Carregando imagem...`);
         const image = await getMarketImage(marketId);
         if (image && image.startsWith('http')) {
+          console.log(`[MarketCard ${marketId}] ✅ Imagem encontrada:`, image.substring(0, 50) + '...');
           setImageUrl(image);
         } else {
+          console.log(`[MarketCard ${marketId}] ❌ Nenhuma imagem encontrada`);
           setImageUrl(null);
         }
       } catch (error) {
-        console.error(`[MarketCard] Erro ao carregar imagem:`, error);
+        console.error(`[MarketCard ${marketId}] Erro ao carregar imagem:`, error);
         setImageUrl(null);
       }
     };
@@ -45,14 +49,15 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
     
     // Ouvir evento de sincronização para recarregar
     const handleImagesSynced = () => {
-      console.log(`[MarketCard] Evento de sincronização recebido, recarregando imagem do mercado ${market.id}...`);
-      loadImage();
+      console.log(`[MarketCard ${marketId}] 🔄 Evento de sincronização recebido, recarregando...`);
+      // Aguardar um pouco para garantir que localStorage foi atualizado
+      setTimeout(loadImage, 100);
     };
     
     window.addEventListener('imagesSynced', handleImagesSynced);
     
-    // Recarregar a cada 10 segundos (menos frequente para evitar rate limit)
-    const interval = setInterval(loadImage, 10000);
+    // Recarregar a cada 15 segundos (menos frequente para evitar rate limit)
+    const interval = setInterval(loadImage, 15000);
     
     return () => {
       clearInterval(interval);

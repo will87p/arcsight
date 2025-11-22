@@ -321,8 +321,11 @@ export async function getMarketImage(marketId: number): Promise<string | null> {
     const localImage = localImages.find(img => img.marketId === marketId);
     if (localImage?.imageUrl && localImage.imageUrl.startsWith('http')) {
       // Se for URL válida, retornar imediatamente (não fazer requisição)
+      // Mas ainda verificar no cache compartilhado periodicamente
       return localImage.imageUrl;
     }
+    
+    // Se não encontrou no localStorage OU encontrou mas é base64, buscar do cache compartilhado
     
     // Só buscar do serviço compartilhado se:
     // 1. Não encontrou no localStorage OU
