@@ -149,8 +149,10 @@ export default function CreateMarket() {
       setTimeout(() => {
         // Usar window.location para garantir que a página seja recarregada completamente
         // Isso garante que os mercados sejam recarregados do contrato
-        const basePath = process.env.NODE_ENV === 'production' ? '/arcsight' : '';
-        window.location.href = `${basePath}/`;
+        import("@/lib/utils").then(({ getBasePath }) => {
+          const basePath = getBasePath();
+          window.location.href = `${basePath}/`;
+        });
       }, 3000); // Aumentar para 3 segundos para dar tempo da transação ser processada
     } catch (err: any) {
       clearTimeout(timeoutId);

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { formatEtherValue, formatTimeRemaining, getMarketUrl } from "@/lib/utils";
+import { formatEtherValue, formatTimeRemaining, getMarketUrl, getFullMarketUrl } from "@/lib/utils";
 import { Market } from "@/lib/useContract";
 import { useWallet } from "@/lib/useWallet";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
@@ -93,8 +93,8 @@ export default function MarketCard({ market, onDelete, deletingMarketId }: Marke
       return;
     }
 
-    // Usar a função helper para gerar URL correta
-    window.location.href = getMarketUrl(market.id);
+    // Usar getFullMarketUrl para garantir que o basePath seja incluído
+    window.location.href = getFullMarketUrl(market.id);
   };
 
   const handleDelete = (e: React.MouseEvent) => {

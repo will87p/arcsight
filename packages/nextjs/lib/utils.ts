@@ -55,3 +55,30 @@ export function getMarketUrl(marketId: number | bigint): string {
   // Retornamos apenas o caminho relativo e deixamos o Next.js cuidar do basePath
   return `/market/${Number(marketId)}`;
 }
+
+// Helper para obter o basePath atual (para uso com window.location.href)
+export function getBasePath(): string {
+  // Verificar se estamos no cliente
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  
+  // Detectar basePath da URL atual
+  const currentPath = window.location.pathname;
+  if (currentPath.startsWith('/arcsight')) {
+    return '/arcsight';
+  }
+  
+  // Fallback: verificar variável de ambiente pública (se configurada)
+  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_BASE_PATH) {
+    return process.env.NEXT_PUBLIC_BASE_PATH;
+  }
+  
+  return '';
+}
+
+// Helper para gerar URL completa com basePath (para window.location.href)
+export function getFullMarketUrl(marketId: number | bigint): string {
+  const basePath = getBasePath();
+  return `${basePath}/market/${Number(marketId)}`;
+}
