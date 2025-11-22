@@ -7,6 +7,18 @@ import { useContract, Market } from "@/lib/useContract";
 import { useWallet } from "@/lib/useWallet";
 import { formatEtherValue, formatTimeRemaining, formatDate, formatAddress } from "@/lib/utils";
 
+// Função necessária para static export com rotas dinâmicas
+// Retorna alguns IDs padrão para gerar páginas estáticas
+// Para GitHub Pages, precisamos gerar pelo menos algumas páginas no build time
+export function generateStaticParams() {
+  // Retorna IDs de 1 a 10 para gerar páginas estáticas iniciais
+  // Isso permite que o build funcione. Páginas com outros IDs precisarão
+  // ser acessadas via JavaScript no cliente (o que já funciona)
+  return Array.from({ length: 10 }, (_, i) => ({
+    id: String(i + 1),
+  }));
+}
+
 export default function MarketDetail() {
   const params = useParams();
   const router = useRouter();
