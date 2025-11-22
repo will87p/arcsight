@@ -9,6 +9,14 @@
 const IMGBB_API_KEY = process.env.NEXT_PUBLIC_IMGBB_API_KEY || '';
 const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload';
 
+// JSONBin.io para sincronização compartilhada (opcional - pode deixar vazio)
+// Se não configurado, as imagens do ImgBB ainda funcionam (URLs públicas)
+const JSONBIN_BIN_ID = process.env.NEXT_PUBLIC_JSONBIN_BIN_ID || '';
+const JSONBIN_API_KEY = process.env.NEXT_PUBLIC_JSONBIN_API_KEY || '';
+const JSONBIN_URL = JSONBIN_BIN_ID 
+  ? `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`
+  : null;
+
 export interface MarketImage {
   marketId: number;
   imageUrl: string; // URL da imagem no ImgBB
